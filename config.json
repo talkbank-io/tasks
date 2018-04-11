@@ -1,0 +1,11 @@
+{
+    "database": {},
+    "amqp": {
+        "host": "localhost",
+        "port": "45672",
+        "user": "test",
+        "password": "tb_test",
+        "vhost": "/",
+        "queueName": "massaction.tasks"
+    }
+}
