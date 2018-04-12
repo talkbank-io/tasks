@@ -11,13 +11,10 @@ import (
 
 	//"github.com/rakanalh/scheduler"
 	//"github.com/rakanalh/scheduler/storage"
+	"github.com/go-pg/pg"
 	"github.com/streadway/amqp"
+	"github.com/killer-djon/tasks/pgdb"
 )
-
-func TaskWithArgs(message string) {
-	fmt.Println("TaskWithArgs is executed. message:", message)
-	//fmt.Printf("got message as String: %s\n", message)
-}
 
 // Read config data.json
 func parseConfig(configFile string) map[string]map[string]string {
@@ -39,11 +36,56 @@ func parseConfig(configFile string) map[string]map[string]string {
 	return dat
 }
 
-func readRabbitConsume(amqpURI string, queueName string) {
-	conn, _ := amqp.Dial(amqpURI)
-	channel, _ := conn.Channel()
+func RunSchedulerTask(body []byte, db *pg.DB) {
+	fmt.Println("TaskWithArgs is executed. message:", string(body))
 
+	var message map[string]interface{}
+	json.Unmarshal(body, &message)
+
+	pgdb.SelectActiveScheduler(db, message)
+}
+
+func readRabbitConsume(amqpURI string, queueName string) {
+	conn, err := amqp.Dial(amqpURI)
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+	channel, err := conn.Channel()
+
+	if err != nil {
+		panic(err)
+	}
 	defer channel.Close()
+
+	q, err := channel.QueueDeclare(
+		queueName, // name
+		true,      // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // arguments
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	err = channel.ExchangeDeclare(
+		queueName,   // name
+		"direct", // type
+		true,     // durable
+		false,    // auto-deleted
+		false,    // internal
+		false,    // no-wait
+		nil,      // arguments
+	)
+
+	err = channel.QueueBind(q.Name, "", q.Name, false, nil)
+	if err != nil {
+		panic(err)
+	}
+
+
 	deliveries, err := channel.Consume(
 		queueName, //queue name
 		"", //consumerTag
@@ -57,10 +99,17 @@ func readRabbitConsume(amqpURI string, queueName string) {
 		log.Fatalf("basic.consume: %v", err)
 	}
 
+	// Parse json config file
+	amqpString := parseConfig("./config.json")
+
+	db := pgdb.Connect(amqpString["database"])
+
+	defer db.Close()
+
 	forever := make(chan bool)
 	go func() {
 		for d := range deliveries {
-			TaskWithArgs(string(d.Body))
+			RunSchedulerTask(d.Body, db)
 		}
 	}()
 
@@ -78,6 +127,7 @@ func main() {
 		amqpString["amqp"]["host"],
 		amqpString["amqp"]["port"],
 		amqpString["amqp"]["vhost"])
+
 	// start consumer
 	readRabbitConsume(amqpUri, amqpString["amqp"]["queueName"])
 }

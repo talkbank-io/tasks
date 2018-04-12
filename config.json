@@ -1,5 +1,11 @@
 {
-    "database": {},
+    "database": {
+        "host": "localhost",
+        "port": "45432",
+        "user": "talkbank",
+        "password": "123456",
+        "db": "talkbank"
+    },
     "amqp": {
         "host": "localhost",
         "port": "45672",
