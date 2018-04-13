@@ -12,7 +12,8 @@
         "user": "test",
         "password": "tb_test",
         "vhost": "/",
-        "queueName": "massaction.tasks"
+        "queueName": "massaction.tasks",
+        "exchangeType": "direct"
     },
-    "maxprocs": 4
+    "threads": 8
 }

@@ -40,7 +40,7 @@ func logSqlEvent(db *pg.DB) {
 
 // Select active Record massAction from DB
 // And return []map[string] of the ResultSets
-func SelectCurrentScheduler(db *pg.DB, message map[string]interface {}) ([]model.ScheduleTask, error) {
+func SelectCurrentScheduler(db *pg.DB) ([]model.ScheduleTask, error) {
 	var schedules []model.ScheduleTask
 	timeNow := time.Now().UTC()
 

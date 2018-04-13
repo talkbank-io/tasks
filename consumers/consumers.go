@@ -112,6 +112,7 @@ func (c *Consumer) Connect() error {
 // connection...
 func (c *Consumer) AnnounceQueue(queueName, bindingKey string) (<-chan amqp.Delivery, error) {
 	log.Printf("declared Exchange, declaring Queue %q", queueName)
+
 	queue, err := c.channel.QueueDeclare(
 		queueName, // name of the queue
 		true, // durable
@@ -134,7 +135,7 @@ func (c *Consumer) AnnounceQueue(queueName, bindingKey string) (<-chan amqp.Deli
 	// I would reccomend upping the about of Threads and Processors the go process
 	// uses before changing this although you will eventually need to reach some
 	// balance between threads, procs, and Qos.
-	err = c.channel.Qos(50, 0, false)
+	err = c.channel.Qos(1, 0, false)
 	if err != nil {
 		return nil, fmt.Errorf("Error setting qos: %s", err)
 	}
