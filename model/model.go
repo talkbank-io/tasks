@@ -1,15 +1,11 @@
 package model
 
 import (
-	"fmt"
 	"time"
-
-	//"github.com/go-pg/pg"
-	//"github.com/go-pg/pg/orm"
 )
 
 // DB Model for table schedule_task
-type SchedulerTask struct {
+type ScheduleTask struct {
 	tableName struct{} `sql:"talkbank_bots.schedule_task"`
 	Id int64 `sql:"id"`
 	ActionId int64
@@ -25,6 +21,7 @@ type SchedulerTask struct {
 	LastRun time.Time
 	NextRun time.Time
 	StartTz string
+	Delivery *Delivery
 }
 
 // DB Model for table delivery
@@ -46,12 +43,4 @@ type Delivery struct {
 	DeletedAt time.Time
 	UserIds string
 	Filter []string `pg:",array"`
-}
-
-func (st SchedulerTask) String() string {
-	return fmt.Sprintf("", st.Id, st.ActionId, st.IsActive)
-}
-
-func (del Delivery) String() string {
-	return fmt.Sprintf("", del.Text, del.UserIds)
 }

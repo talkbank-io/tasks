@@ -14,6 +14,7 @@ import (
 	"github.com/go-pg/pg"
 	"github.com/streadway/amqp"
 	"github.com/killer-djon/tasks/pgdb"
+	//"github.com/killer-djon/tasks/consumers"
 )
 
 // Read config data.json
@@ -36,13 +37,26 @@ func parseConfig(configFile string) map[string]map[string]string {
 	return dat
 }
 
-func RunSchedulerTask(body []byte, db *pg.DB) {
+// Запуск планировщика задачи
+func RunSchedulerTask(d amqp.Delivery, db *pg.DB) {
+	body := d.Body
 	fmt.Println("TaskWithArgs is executed. message:", string(body))
 
 	var message map[string]interface{}
 	json.Unmarshal(body, &message)
 
-	pgdb.SelectActiveScheduler(db, message)
+	// Результат полученный из базы
+	resultSet, err := pgdb.SelectCurrentScheduler(db, message)
+
+	if( err != nil ){
+		fmt.Println("Bad response must be requeue")
+
+		d.Reject(true)
+	}
+
+	for i, schedule := range resultSet {
+		fmt.Printf("Index = %d, Type: %s, Title: %s, Users: %s\n", i, schedule.Type, schedule.Delivery.Title, schedule.Delivery.UserIds)
+	}
 }
 
 func readRabbitConsume(amqpURI string, queueName string) {
@@ -54,7 +68,7 @@ func readRabbitConsume(amqpURI string, queueName string) {
 	channel, err := conn.Channel()
 
 	if err != nil {
-		panic(err)
+		log.Fatalf("Open channel: %v", err)
 	}
 	defer channel.Close()
 
@@ -67,7 +81,7 @@ func readRabbitConsume(amqpURI string, queueName string) {
 		nil,       // arguments
 	)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Queue.declare: %v", err)
 	}
 
 	err = channel.ExchangeDeclare(
@@ -82,7 +96,7 @@ func readRabbitConsume(amqpURI string, queueName string) {
 
 	err = channel.QueueBind(q.Name, "", q.Name, false, nil)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Queue.bind: %v", err)
 	}
 
 
@@ -109,7 +123,7 @@ func readRabbitConsume(amqpURI string, queueName string) {
 	forever := make(chan bool)
 	go func() {
 		for d := range deliveries {
-			RunSchedulerTask(d.Body, db)
+			RunSchedulerTask(d, db)
 		}
 	}()
 

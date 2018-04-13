@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"time"
-	"github.com/fatih/structs"
 	"github.com/go-pg/pg"
+	"github.com/go-pg/pg/orm"
 	"github.com/killer-djon/tasks/model"
 )
 
@@ -19,6 +19,13 @@ func Connect(config map[string]string) *pg.DB {
 		Database: config["db"],
 	})
 
+	// логируем искходный запрос SQL
+	logSqlEvent(db)
+
+	return db
+}
+
+func logSqlEvent(db *pg.DB) {
 	db.OnQueryProcessed(func(event *pg.QueryProcessedEvent) {
 		query, err := event.FormattedQuery()
 		if err != nil {
@@ -27,61 +34,59 @@ func Connect(config map[string]string) *pg.DB {
 
 		log.Printf("%s %s", time.Since(event.StartTime), query)
 	})
-
-	return db
 }
 
-/*
-public static function getCurrent()
-    {
-        $now = Carbon::now('UTC')->second(0);
 
-        $query = ScheduleTask::select('schedule_task.*' , 'delivery.title')
-            ->join('delivery', 'schedule_task.action_id', '=', 'delivery.id')
-            ->where([
-                ['schedule_task.is_active', true],
-                ['schedule_task.from_datetime', '<=', $now]
-            ])
-            ->where(function ($query) use ($now) {
-                return $query->whereNull('schedule_task.to_datetime')
-                    ->orWhere('schedule_task.to_datetime', '>=', $now);
-            });
-
-        return $query->get();
-    }
-*/
 
 // Select active Record massAction from DB
-//, message map[string]interface {}
-func SelectActiveScheduler(db *pg.DB, message map[string]interface {}) {
-	schedule := new(model.SchedulerTask)
+// And return []map[string] of the ResultSets
+func SelectCurrentScheduler(db *pg.DB, message map[string]interface {}) ([]model.ScheduleTask, error) {
+	var schedules []model.ScheduleTask
+	timeNow := time.Now().UTC()
 
-	var result []struct {
-		SchedulerId int
-		ActionId int
-		DeliveryTitle string
-		Type string
-		Template string
-	}
-
-	err := db.Model(schedule).
-		ColumnExpr("scheduler_task.id AS scheduler_id").
-		ColumnExpr("scheduler_task.action_id AS action_id").
-		ColumnExpr("scheduler_task.type AS type").
-		ColumnExpr("scheduler_task.template AS template").
-		ColumnExpr("delivery.title AS delivery_title").
-		Join("JOIN talkbank_bots.delivery AS delivery ON delivery.id = scheduler_task.action_id").
-		Where("scheduler_task.action_id = ?", message["action_id"]).
-		Order("scheduler_task.created_at DESC").
-		Select(&result)
+	err := db.Model(&schedules).
+		ColumnExpr("schedule_task.*").
+		ColumnExpr("delivery.title AS delivery__title").
+		ColumnExpr("delivery.user_ids AS delivery__user_ids").
+		Join("JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
+		Where("schedule_task.is_active = ?", true).
+		Where("schedule_task.from_datetime <= ?", timeNow).
+		WhereGroup(func(q *orm.Query) (*orm.Query, error) {
+		return q.
+		WhereOr("schedule_task.to_datetime IS NULL").
+			WhereOr("schedule_task.to_datetime >= ?", timeNow), nil
+	}).
+		Order("schedule_task.created_at DESC").
+		Select()
 
 	if err != nil {
-		panic(err)
+		fmt.Println("Error to get data from scheduler_task")
+		return nil, err
 	}
 
-	for _, val := range result {
-		value := structs.Map(val)
-		fmt.Println(value)
-	}
-
+	return schedules, nil
 }
+
+
+/*
+public function getActiveUsers()
+{
+	$query = $this->entity->query();
+        $query->selectRaw('distinct on (users.id) users.*');
+        $query->join(MessengerUser::getFullTableName() . ' as m', 'users.id', 'm.user_id');
+        $query->where('m.is_active', true);
+
+        if (is_array($ids) && count($ids) > 0) {
+            $query->whereIn('users.id', $ids);
+        }
+
+        if ($filter) {
+            $query = $this->getQbByFilter($filter, $query);
+        }
+
+        $query->orderBy('users.id');
+
+        return $query->get();
+}
+
+*/
