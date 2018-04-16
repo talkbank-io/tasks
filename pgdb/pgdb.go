@@ -9,24 +9,36 @@ import (
 	"github.com/killer-djon/tasks/model"
 )
 
-// Connect to database with options
-func Connect(config map[string]string) *pg.DB {
-	db := pg.Connect(&pg.Options{
+var ScheduleRow []struct {
+	Id int64
+	Template string
+	Type string
+}
+
+type PgDB struct {
+	db        *pg.DB
+	Schedules []model.ScheduleTask
+}
+
+// Create new Struct of PgDB
+// and connect to database
+func NewPgDB(config map[string]string) PgDB {
+	pgmodel := new(PgDB)
+	pgmodel.db = pg.Connect(&pg.Options{
 		Network: "tcp",
-		Addr:     config["host"]+":"+config["port"],
+		Addr:     config["host"] + ":" + config["port"],
 		User:     config["user"],
 		Password: config["password"],
 		Database: config["db"],
 	})
 
-	// логируем искходный запрос SQL
-	logSqlEvent(db)
-
-	return db
+	pgmodel.logSqlEvent()
+	return *pgmodel
 }
 
-func logSqlEvent(db *pg.DB) {
-	db.OnQueryProcessed(func(event *pg.QueryProcessedEvent) {
+// Initialize log event with SQL
+func (pgmodel *PgDB) logSqlEvent() {
+	pgmodel.db.OnQueryProcessed(func(event *pg.QueryProcessedEvent) {
 		query, err := event.FormattedQuery()
 		if err != nil {
 			panic(err)
@@ -36,27 +48,27 @@ func logSqlEvent(db *pg.DB) {
 	})
 }
 
-
-
 // Select active Record massAction from DB
 // And return []map[string] of the ResultSets
-func SelectCurrentScheduler(db *pg.DB) ([]model.ScheduleTask, error) {
-	var schedules []model.ScheduleTask
+func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 	timeNow := time.Now().UTC()
 
-	err := db.Model(&schedules).
+	err := pgmodel.db.Model(&pgmodel.Schedules).
 		ColumnExpr("schedule_task.*").
 		ColumnExpr("delivery.title AS delivery__title").
 		ColumnExpr("delivery.user_ids AS delivery__user_ids").
-		Join("JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
+		ColumnExpr("delivery.id AS delivery__id").
+		ColumnExpr("delivery.filter AS delivery__filter").
+		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
 		Where("schedule_task.is_active = ?", true).
 		Where("schedule_task.from_datetime <= ?", timeNow).
 		WhereGroup(func(q *orm.Query) (*orm.Query, error) {
 		return q.
-		WhereOr("schedule_task.to_datetime IS NULL").
+			WhereOr("schedule_task.to_datetime IS NULL").
 			WhereOr("schedule_task.to_datetime >= ?", timeNow), nil
-	}).
-		Order("schedule_task.created_at DESC").
+		}).
+		Group("delivery__title", "delivery.user_ids", "delivery.id", "schedule_task.id").
+		Order("schedule_task.id ASC").
 		Select()
 
 	if err != nil {
@@ -64,9 +76,13 @@ func SelectCurrentScheduler(db *pg.DB) ([]model.ScheduleTask, error) {
 		return nil, err
 	}
 
-	return schedules, nil
+	return pgmodel.Schedules, nil
+
 }
 
+func (pgmodel *PgDB) GetActiveUsers() {
+
+}
 
 /*
 public function getActiveUsers()

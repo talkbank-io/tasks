@@ -4,6 +4,13 @@ import (
 	"time"
 )
 
+type Filter []struct{
+	Boolean string `json:"boolean"`
+	Path string `json:"path"`
+	Op string `json:"op"`
+	Value string `json:"value"`
+}
+
 // DB Model for table schedule_task
 type ScheduleTask struct {
 	tableName struct{} `sql:"talkbank_bots.schedule_task"`
@@ -42,5 +49,5 @@ type Delivery struct {
 	UpdatedAt time.Time
 	DeletedAt time.Time
 	UserIds string
-	Filter []string `pg:",array"`
+	Filter Filter
 }
