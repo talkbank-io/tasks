@@ -5,14 +5,16 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"runtime"
-	//"reflect"
+	"strings"
+	"strconv"
 
+	//"reflect"
 	"fmt"
 	"github.com/streadway/amqp"
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/pgdb"
 	"github.com/killer-djon/tasks/consumers"
-	"github.com/killer-djon/tasks/schedule"
+	//"github.com/killer-djon/tasks/schedule"
 )
 
 // Parse json config file
@@ -56,7 +58,6 @@ func parseConfig(configFile string) (map[string]interface{}, error) {
 
 
 func main() {
-
 	go func() {
 		// Результат полученный из базы
 		resultSet, err := database.SelectCurrentScheduler()
@@ -68,9 +69,9 @@ func main() {
 		for _, scheduleItem := range resultSet {
 
 			if ( scheduleItem.Type == "onetime" ){
-				//go StartOnetimeScheduler(scheduleRow.Id, scheduleRow.Template)
+				go StartOnetimeScheduler(scheduleItem)
 			}else {
-				go StartRecurrentlyScheduler(scheduleItem)
+				//go StartRecurrentlyScheduler(&scheduleItem)
 			}
 		}
 	}()
@@ -104,7 +105,7 @@ func main() {
 	threadsConfig := amqpString["threads"].(float64)
 	threads = int(threadsConfig)
 
-	fmt.Printf("Thread number %d", threads)
+	fmt.Printf("Thread number %d\n", threads)
 	conn.Handle(deliveries, handler, threads, amqpConfig["queueName"].(string), "")
 
 }
@@ -119,7 +120,6 @@ func handler(deliveries <-chan amqp.Delivery) {
 		fmt.Println("Got message from queue:", message)
 		go RunSchedulerTask(d)
 	}
-
 }
 
 
@@ -142,26 +142,51 @@ func RunSchedulerTask(d amqp.Delivery) {
 	for _, scheduleItem := range resultSet {
 
 		if ( scheduleItem.Type == "onetime" ){
-			//go StartOnetimeScheduler(scheduleItem)
+			go StartOnetimeScheduler(scheduleItem)
 		}else {
-			go StartRecurrentlyScheduler(scheduleItem)
+			//go StartRecurrentlyScheduler(&scheduleItem)
 		}
 	}
 
 	d.Ack(false)
-
 }
 
 
 // Запуск планировщика по расписанию
-func StartRecurrentlyScheduler(scheduleRow model.ScheduleTask) {
+func StartRecurrentlyScheduler(scheduleTask *model.ScheduleTask) {
 	//fmt.Printf("Start recurrently scheduler at Schedule ID: %d, with template: %s\n", scheduleID, template)
+	//recurrentlySchedule := schedule.NewRecurrently(scheduleTask)
+	//recurrentlySchedule.Print()
 
-	recurrentlySchedule := schedule.NewRecurrently(scheduleRow)
-	recurrentlySchedule.Print()
+	/*users, err := database.GetActiveUsers()
+
+	if( err != nil ){
+		fmt.Println("Error to get data users", err)
+	}
+
+	for _, userMessenger := range users {
+		fmt.Println(userMessenger.Id)
+	}*/
+	fmt.Println(scheduleTask.Delivery.UserIds, scheduleTask.Delivery.Filter)
+
 	//835, 817, 829, 832, 796, 802,  808
 }
 
-func StartOnetimeScheduler(scheduleRow model.ScheduleTask) {
-	//fmt.Printf("Start onetime scheduler at Schedule ID: %d, with template: %s\n", scheduleID, template)
+func StartOnetimeScheduler(scheduleTask model.ScheduleTask) {
+	// []string
+	userStringsIds := strings.Split(strings.Trim(scheduleTask.Delivery.UserIds, " "), ",")
+	userIds := make([]int, len(userStringsIds))
+	for i, userId := range userStringsIds {
+		trimStringUserId := strings.Trim(userId, " ")
+		userIds[i], _ = strconv.Atoi(trimStringUserId)
+	}
+
+	_, err := database.GetActiveUsers(userIds, scheduleTask.Delivery.Filter)
+
+	if ( err != nil ) {
+		fmt.Println("Error to get users by params", err)
+	}
+
+	//onetimeSchedule := schedule.NewOnetime(scheduleTask, users)
+	//onetimeSchedule.Run()
 }

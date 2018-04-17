@@ -22,13 +22,13 @@ type Recurrently struct {
 }
 
 // Constructor
-func NewRecurrently(scheduleRow model.ScheduleTask) *Recurrently {
+func NewRecurrently(scheduleTask model.ScheduleTask) *Recurrently {
 
 	var result Template
-	json.Unmarshal([]byte(scheduleRow.Template), &result)
+	json.Unmarshal([]byte(scheduleTask.Template), &result)
 
 	return &Recurrently{
-		row: scheduleRow,
+		row: scheduleTask,
 		template: &result,
 	}
 }
@@ -39,7 +39,7 @@ func (schedule *Recurrently) Print() {
 	//minute, _ := strconv.Atoi(schedule.template.Minute)
 
 	cronJob := cron.New()
-	_, err := cronJob.AddFunc("* * * * *", func() {
+	_, err := cronJob.AddFunc("*/10 * * * * *", func() {
 		Action(schedule)
 	} )
 

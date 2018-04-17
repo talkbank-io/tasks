@@ -4,11 +4,11 @@ import (
 	"time"
 )
 
-type Filter []struct{
-	Boolean string `json:"boolean"`
-	Path string `json:"path"`
-	Op string `json:"op"`
-	Value string `json:"value"`
+type Filter struct{
+	Boolean string
+	Path string
+	Op string
+	Value string
 }
 
 // DB Model for table schedule_task
@@ -22,7 +22,7 @@ type ScheduleTask struct {
 	FromDatetime time.Time
 	ToDatetime time.Time
 	IsActive  bool
-	CreatedAt time.Time
+	CreatedAt time.Time `sql:"default:now()"`
 	UpdatedAt time.Time
 	NextDatetime time.Time
 	LastRun time.Time
@@ -45,9 +45,22 @@ type Delivery struct {
 	CategoryId int64
 	TimeCondition string `sql:"timeCondition"`
 	ParametersCondition string `sql:"parametersCondition"`
-	CreatedAt time.Time
+	CreatedAt time.Time `sql:"default:now()"`
 	UpdatedAt time.Time
 	DeletedAt time.Time
 	UserIds string
-	Filter Filter
+	Filter []Filter
+}
+
+type ScheduleRepository struct {
+	task []ScheduleTask
+	deliver []Delivery
+}
+
+func NewScheduleRepository() *ScheduleRepository {
+	return &ScheduleRepository{}
+}
+
+func (scheduleModel *ScheduleRepository) GetTaskModel() []ScheduleTask{
+	return scheduleModel.task
 }
