@@ -10,12 +10,15 @@ import (
 	"github.com/killer-djon/tasks/model"
 	"strings"
 	"regexp"
+	"strconv"
 )
 
+const TIME_FORMAT = "2006-01-02"
+
 var ScheduleRow []struct {
-	Id int64
+	Id       int64
 	Template string
-	Type string
+	Type     string
 }
 
 type PgDB struct {
@@ -69,10 +72,10 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 		Where("schedule_task.from_datetime <= ?", timeNow).
 		WhereGroup(func(q *orm.Query) (*orm.Query, error) {
 		return q.
-			WhereOr("schedule_task.to_datetime IS NULL").
+		WhereOr("schedule_task.to_datetime IS NULL").
 			WhereOr("schedule_task.to_datetime >= ?", timeNow), nil
-		}).
-		//Group("delivery__title", "delivery.user_ids", "delivery.id", "schedule_task.id").
+	}).
+	//Group("delivery__title", "delivery.user_ids", "delivery.id", "schedule_task.id").
 		Order("schedule_task.id ASC").
 		Select()
 
@@ -96,13 +99,21 @@ func (pgmodel *PgDB) GetActiveUsers(userIds []int, filter []model.Filter) ([]*mo
 		Join("INNER JOIN talkbank_bots.messenger_users AS messenger_users ON messenger_users.user_id = users.id").
 		Where("messenger_users.is_active = ?", true)
 
-	if ( userIds[0] != 0 ){
+	if ( userIds[0] != 0 ) {
 		query = query.Where("users.id IN (?)", pg.In(userIds))
 	}
 
-	query = pgmodel.GetFilterQuery(query, filter)
+	var i int
+	_, i = pgmodel.GetFilterQuery(query.New(), filter)
+	if( i > 0 ){
+		query = query.WhereGroup(func(q *orm.Query) (*orm.Query, error){
+			q, _ = pgmodel.GetFilterQuery(q, filter)
 
-	err := query.Select()
+			return q, nil
+		})
+	}
+
+	err := query.Order("users.id ASC").Select()
 
 	if err != nil {
 		fmt.Println("Error to get data from users", err)
@@ -113,70 +124,109 @@ func (pgmodel *PgDB) GetActiveUsers(userIds []int, filter []model.Filter) ([]*mo
 
 }
 
+func (pgmodel *PgDB) GetFilterQuery(query *orm.Query, filters []model.Filter) (*orm.Query, int) {
+	i := 0
+	for _, filter := range filters {
+		if ( filter.Path != "" ) {
+			pathRegex := regexp.MustCompile("[^.*\\w]")
+			path := pathRegex.ReplaceAllString(filter.Path, "")
 
-func (pgmodel *PgDB) GetFilterQuery(query *orm.Query, filters []model.Filter) *orm.Query {
-	if ( filters != nil ){
-		for _, filter := range filters {
-			if ( filter.Path != "" ){
-				pathRegex, _ := regexp.Compile("[^.*\\w]")
-				path := pathRegex.ReplaceAllString(filter.Path, "")
-				value := strings.ToLower(filter.Value)
-				op := filter.Op
-				boolean := filter.Boolean
+			valueRegex := regexp.MustCompile("([+-]?)(\\d+) (months|days)")
+			value := strings.ToLower(filter.Value)
+			match := valueRegex.FindStringSubmatch(value)
 
-				fmt.Printf("Path: %s, Value: %s, Op: %s, Boolean: %s\n\n", path, value, op, boolean)
+			if ( len(match) > 0 ) {
+				if ( match[1] == "" ) {
+					match[1] = "+"
+				}
+				timeStr, _ := strconv.Atoi(match[1] + match[2])
+				timeNow := time.Now()
+
+				timeModified := timeNow.AddDate(0, 0, timeStr)
+				if (match[3] == "months") {
+					timeModified = timeNow.AddDate(0, timeStr, 0)
+				}
+
+				value = timeModified.Format(TIME_FORMAT)
 			}
 
+			op := filter.Op
+			boolean := filter.Boolean
+
+			// Получаем структуру поля для параметров
+			// в JSON строке
+			pathField := pgmodel.collectPathReference(path)
+
+			var whereString []string
+
+			switch op {
+			case "exist":
+				whereString = append(whereString, pathField + " IS NOT NULL", boolean, value)
+			case "not":
+				whereString = append(whereString, pathField + " IS NULL", boolean, value)
+			case "=":
+				if ( value != "" ) {
+					whereString = append(whereString, pathField + " = ?", boolean, value)
+				}
+
+			case "!=":
+				if ( value != "" ) {
+					whereString = append(whereString, pathField + " != ?", boolean, value)
+				}
+			case ">":
+				if ( value != "" ) {
+					whereString = append(whereString, pathField + " > ?", boolean, value)
+				}
+			case "<":
+				if ( value != "" ) {
+					whereString = append(whereString, pathField + " < ?", boolean, value)
+				}
+			case "like":
+				if ( value != "" ) {
+					value = "%" + value + "%"
+					whereString = append(whereString, "LOWER(" + pathField + ") ILIKE ?", boolean, value)
+				}
+			}
+			//fmt.Println("Length: ", whereString)
+
+			if ( len(whereString) > 0 ) {
+				if ( whereString[1] == "or" ) {
+					query = query.WhereOr(whereString[0], value)
+				} else {
+					query = query.Where(whereString[0], value)
+				}
+
+				i++
+			}
 		}
+
 	}
 
-	return query
+	return query, i
 }
 
-/*
-if (!$qb) {
-            $qb = $this->entity->select(['id', 'parameters',]);
-        }
+/**
+ * Create string with params field
+ *
+ * @param string
+ * @return string
+ */
+func (pgmodel *PgDB) collectPathReference(path string) string {
+	paths := strings.Split(path, ".")
+	lastFieldName := "users.parameters"
+	if ( len(paths) > 1 ) {
+		last := paths[len(paths) - 1] // Only get last element
+		paths = paths[:len(paths) - 1] // Remove last element
 
+		for _, pathItem := range paths {
+			lastFieldName += " -> '" + pathItem + "'"
+		}
 
-        foreach ($filters as $filter) {
+		lastFieldName += " ->> '" + last + "'"
+	} else {
+		lastFieldName += " ->> '" + paths[0] + "'"
+	}
 
-            $path = preg_replace('/[^.*\w]/', '', $filter['path']);
-            $value = mb_strtolower($filter['value']);
-            $op = $filter['op'];
-            $boolean = $filter['boolean'];
+	return lastFieldName
+}
 
-            if (preg_match("/([+-]?)(\d+) (months|days)/i", $value, $m)) {
-                $shift = $m[1] . $m[2] . ' ' . $m[3];
-                $value = date('Y-m-d', strtotime($shift));
-            }
-
-            $wherePath = $this->collectPathReference('users.parameters', $path);
-            switch ($op) {
-                case 'exist':
-                    $qb->whereRaw($wherePath . ' IS NOT NULL', [], $boolean);
-                    break;
-                case 'not':
-                    $qb->whereRaw($wherePath . ' IS NULL', [], $boolean);
-                    break;
-                case '=':
-                    $qb->whereRaw($wherePath . ' ilike ?', [$value], $boolean);
-                    break;
-                case '!=':
-                    $qb->whereRaw($wherePath . ' not ilike ?', [$value], $boolean);
-
-                    break;
-                case '>':
-                    $qb->whereRaw($wherePath . ' >= ?', [$value], $boolean);
-                    break;
-                case '<':
-                    $qb->whereRaw($wherePath . ' <= ?', [$value], $boolean);
-                    break;
-                case 'like':
-                    // f*cking laravel! For like whereRaw escapes...
-                    $qb->whereRaw('LOWER(' . $wherePath . ') ilike ?', ['%' . $value . '%'],
-                        $boolean);
-                    break;
-            }
-        }
-*/

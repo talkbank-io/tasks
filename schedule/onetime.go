@@ -25,3 +25,16 @@ func (schedule *Onetime) Run() {
 	}
 
 }
+/*
+    if ($task->last_run >= $task->from_datetime) {
+	\Log::debug("Task $taskId was completed.");
+	return false;
+    }
+
+    // Что если запуск таска работает больше 1 минуты?
+    // Временное решение, надеюсь.
+    $task->last_run = Carbon::now();
+    $task->save();
+
+    $localDT = $task->from_datetime;
+*/

@@ -8,13 +8,12 @@ import (
 	"strings"
 	"strconv"
 
-	//"reflect"
 	"fmt"
 	"github.com/streadway/amqp"
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/pgdb"
 	"github.com/killer-djon/tasks/consumers"
-	//"github.com/killer-djon/tasks/schedule"
+	"github.com/killer-djon/tasks/schedule"
 )
 
 // Parse json config file
@@ -173,7 +172,7 @@ func StartRecurrentlyScheduler(scheduleTask *model.ScheduleTask) {
 }
 
 func StartOnetimeScheduler(scheduleTask model.ScheduleTask) {
-	// []string
+
 	userStringsIds := strings.Split(strings.Trim(scheduleTask.Delivery.UserIds, " "), ",")
 	userIds := make([]int, len(userStringsIds))
 	for i, userId := range userStringsIds {
@@ -181,12 +180,12 @@ func StartOnetimeScheduler(scheduleTask model.ScheduleTask) {
 		userIds[i], _ = strconv.Atoi(trimStringUserId)
 	}
 
-	_, err := database.GetActiveUsers(userIds, scheduleTask.Delivery.Filter)
+	users, err := database.GetActiveUsers(userIds, scheduleTask.Delivery.Filter)
 
 	if ( err != nil ) {
 		fmt.Println("Error to get users by params", err)
 	}
 
-	//onetimeSchedule := schedule.NewOnetime(scheduleTask, users)
-	//onetimeSchedule.Run()
+	onetimeSchedule := schedule.NewOnetime(scheduleTask, users)
+	onetimeSchedule.Run()
 }
