@@ -3,6 +3,7 @@ package schedule
 import (
 	"fmt"
 	"github.com/killer-djon/tasks/model"
+
 	//"github.com/elgs/cron"
 )
 
@@ -20,10 +21,15 @@ func NewOnetime(scheduleModel model.ScheduleTask, users []*model.Users) *Onetime
 }
 
 func (schedule *Onetime) Run() {
-	for _, user := range schedule.users {
-		fmt.Println(schedule.row.Id, user.Id)
-	}
 
+	lastRun := schedule.row.LastRun.UTC()
+	fromDate := schedule.row.FromDatetime.UTC()
+
+	if ( lastRun.Before(fromDate) ){
+		for _, user := range schedule.users {
+			fmt.Println(schedule.row.Id, user.Id, schedule.row.LastRun, schedule.row.FromDatetime)
+		}
+	}
 }
 /*
     if ($task->last_run >= $task->from_datetime) {
