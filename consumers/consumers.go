@@ -48,6 +48,10 @@ bindingKey string) *Consumer {
 
 }
 
+func (c *Consumer) GetConnection() *amqp.Connection {
+	return c.conn
+}
+
 // ReConnect is called in places where NotifyClose() channel is called
 // wait 30 seconds before trying to reconnect. Any shorter amount of time
 // will  likely destroy the error log while waiting for servers to come
@@ -78,6 +82,7 @@ func (c *Consumer) Connect() error {
 	if err != nil {
 		return fmt.Errorf("Dial: %s", err)
 	}
+
 
 	go func() {
 		// Waits here for the channel to be closed
