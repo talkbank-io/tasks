@@ -5,9 +5,9 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"runtime"
-	"strings"
-	"strconv"
-	"github.com/elgs/cron"
+	//"strings"
+	//"strconv"
+	//"github.com/elgs/cron"
 
 	"fmt"
 	"github.com/streadway/amqp"
@@ -71,25 +71,11 @@ func main() {
 			fmt.Println("Error to get data from Db", err)
 		}
 
-		cronJob := cron.New()
-		cronJob.Start()
-
-		for i, scheduleItem := range resultSet {
+		for _, scheduleItem := range resultSet {
 			if ( scheduleItem.Type == "onetime" ){
 
-				jobNumber := i+1
-				jobStatus := cronJob.Status(jobNumber)
-				fmt.Println("Job Status: ", jobStatus)
-
-				if( jobStatus == -1 ) {
-					fmt.Println("SChedule item to start:", scheduleItem.Id)
-					scheduleTaskItem := scheduleItem
-					cronJob.AddFunc("*/3 * * * * *", func(){
-						fmt.Println("add job function:", scheduleTaskItem.Id, jobNumber)
-						StartOnetimeScheduler(scheduleTaskItem, jobNumber, cronJob)
-					})
-
-				}
+				scheduleTaskItem := scheduleItem
+				go StartOnetimeScheduler(scheduleTaskItem)
 			}else {
 				//go StartRecurrentlyScheduler(&scheduleItem)
 			}
@@ -139,10 +125,6 @@ func runConsumer() {
 func handler(deliveries <-chan amqp.Delivery) {
 
 	for d := range deliveries {
-		var message map[string]interface{}
-		json.Unmarshal(d.Body, &message)
-
-		fmt.Println("Got message from queue:", message)
 		RunSchedulerTask(d)
 	}
 }
@@ -165,23 +147,10 @@ func RunSchedulerTask(d amqp.Delivery) {
 		d.Ack(true)
 	}
 
-	cronJob := cron.New()
-	cronJob.Start()
-
-	for i, scheduleItem := range resultSet {
+	for _, scheduleItem := range resultSet {
 		if ( scheduleItem.Type == "onetime" ){
-			jobNumber := i+1
-			jobStatus := cronJob.Status(jobNumber)
-			fmt.Println("Job Status: ", jobStatus)
-
-			if( jobStatus == -1 ) {
-				fmt.Println("SChedule item to start:", scheduleItem.Id)
-				scheduleTaskItem := scheduleItem
-				cronJob.AddFunc("*/3 * * * * *", func(){
-					go StartOnetimeScheduler(scheduleTaskItem, jobNumber, cronJob)
-				})
-
-			}
+			scheduleTaskItem := scheduleItem
+			go StartOnetimeScheduler(scheduleTaskItem)
 		}else {
 			//go StartRecurrentlyScheduler(&scheduleItem)
 		}
@@ -211,23 +180,16 @@ func StartRecurrentlyScheduler(scheduleTask *model.ScheduleTask) {
 	//835, 817, 829, 832, 796, 802,  808
 }
 
-func StartOnetimeScheduler(scheduleTask model.ScheduleTask, jobNumber int, cronJob *cron.Cron) {
+func StartOnetimeScheduler(scheduleTask model.ScheduleTask) {
 
-	lastRun := scheduleTask.LastRun.UTC()
-	fromDate := scheduleTask.FromDatetime.UTC()
+	publisherConfig := amqpString["publisher"].(map[string]interface{})
 
-	fmt.Println("Start on schedule id:", scheduleTask.Id)
+	lastRun := scheduleTask.LastRun
+	fromDate := scheduleTask.FromDatetime
 
 	if ( lastRun.Before(fromDate) ){
 
-		userStringsIds := strings.Split(strings.Trim(scheduleTask.Delivery.UserIds, " "), ",")
-		userIds := make([]int, len(userStringsIds))
-		for i, userId := range userStringsIds {
-			trimStringUserId := strings.Trim(userId, " ")
-			userIds[i], _ = strconv.Atoi(trimStringUserId)
-		}
-
-		users, err := database.GetActiveUsers(userIds, scheduleTask.Delivery.Filter)
+		users, err := database.GetActiveUsers(scheduleTask.Delivery.UserIds, scheduleTask.Delivery.Filter)
 
 		if ( err != nil ) {
 			fmt.Println("Error to get users by params", err)
@@ -237,8 +199,6 @@ func StartOnetimeScheduler(scheduleTask model.ScheduleTask, jobNumber int, cronJ
 
 		onetimeSchedule := schedule.NewOnetime(scheduleTask, users)
 		onetimeSchedule.SetAmqp(publisherQueue)
-		onetimeSchedule.Run(cronJob, jobNumber)
-	}else{
-		cronJob.RemoveFunc(jobNumber)
+		onetimeSchedule.Run(publisherConfig)
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/publisher"
-	"github.com/elgs/cron"
+	//"github.com/elgs/cron"
 )
 
 type Onetime struct {
@@ -16,8 +16,17 @@ type Onetime struct {
 }
 
 type QueueMessage struct {
-	UserId int64
-	TaskId int64
+	UserId       int64
+	TaskId       int64
+	MassActionId int64
+	Text         string
+}
+
+type FinalizeMessage struct {
+	CoverageCount  int
+	PublishCount   int
+	UnpublishCount int
+	ScheduleId     int64
 }
 
 // Constructor
@@ -28,17 +37,15 @@ func NewOnetime(scheduleModel model.ScheduleTask, users []*model.Users) *Onetime
 	}
 }
 
-func (schedule *Onetime) Run(cronJob *cron.Cron, jobNumber int) {
+func (schedule *Onetime) Run(publisherConfig map[string]interface{}) {
+
 	countPublishing := 0
 	for _, user := range schedule.users {
-		fmt.Println(schedule.row.Id, user.Id, schedule.row.LastRun, schedule.row.FromDatetime)
-
-		var q_message []QueueMessage
-		q_message = []QueueMessage{
-			QueueMessage{
-				UserId: user.Id,
-				TaskId: schedule.row.Id,
-			},
+		q_message := &QueueMessage{
+			UserId: user.Id,
+			TaskId: schedule.row.Id,
+			MassActionId: schedule.row.Delivery.Id,
+			Text: schedule.row.Delivery.Text,
 		}
 
 		fmt.Println("Will be publis data:", q_message)
@@ -48,45 +55,25 @@ func (schedule *Onetime) Run(cronJob *cron.Cron, jobNumber int) {
 			fmt.Println("error:", err)
 		}
 
-
-
 		channel := schedule.pub
-		isPublish, err := channel.Publish(message)
+		isPublish, err := channel.Publish(publisherConfig["queue_onetime"].(string), message)
 
 		if err != nil {
 			fmt.Println("error on publishing:", err)
 		}
 
-		if( isPublish == true ){
-			countPublishing++
-		}
+		countPublishing++
 
 		fmt.Println("Message will be publish:", isPublish)
 
 	}
 
 	if ( countPublishing == len(schedule.users) ){
-		cronJob.RemoveFunc(jobNumber)
-		fmt.Println("Cron job will be removed:", jobNumber)
+		fmt.Printf("Items will be published countPublished=%d, lenUsers=%d", countPublishing, len(schedule.users))
 	}
-	//fmt.Printf("Len countpublishing: %d, count Users: %d, Of job number: %d", countPublishing, len(schedule.users), jobNumber)
+
 }
 
 func (schedule *Onetime) SetAmqp(pub *publisher.Publisher) {
 	schedule.pub = pub
 }
-
-
-/*
-    if ($task->last_run >= $task->from_datetime) {
-	\Log::debug("Task $taskId was completed.");
-	return false;
-    }
-
-    // Что если запуск таска работает больше 1 минуты?
-    // Временное решение, надеюсь.
-    $task->last_run = Carbon::now();
-    $task->save();
-
-    $localDT = $task->from_datetime;
-*/
