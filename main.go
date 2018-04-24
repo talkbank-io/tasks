@@ -5,10 +5,12 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"runtime"
+	//"time"
 	//"strings"
 	//"strconv"
 	//"github.com/elgs/cron"
 
+	"github.com/killer-djon/tasks/cron"
 	"fmt"
 	"github.com/streadway/amqp"
 	"github.com/killer-djon/tasks/model"
@@ -24,6 +26,12 @@ var configDB = make(map[string]string)
 
 var database pgdb.PgDB
 
+type CronJob struct {
+	w *cron.Cron
+}
+
+var cronJob *CronJob
+
 func init()  {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	config := amqpString["database"].(map[string]interface{})
@@ -32,8 +40,10 @@ func init()  {
 	}
 
 	database = pgdb.NewPgDB(configDB)
-
-
+	cronJob = &CronJob{
+		w: cron.New(),
+	}
+	cronJob.w.Start()
 }
 
 // Read config data.json
@@ -62,32 +72,13 @@ func parseConfig(configFile string) (map[string]interface{}, error) {
 
 func main() {
 
-	go func(){
-		// Результат полученный из базы
-		resultSet, err := database.SelectCurrentScheduler()
-
-
-		if( err != nil ){
-			fmt.Println("Error to get data from Db", err)
-		}
-
-		for _, scheduleItem := range resultSet {
-			if ( scheduleItem.Type == "onetime" ){
-
-				scheduleTaskItem := scheduleItem
-				go StartOnetimeScheduler(scheduleTaskItem)
-			}else {
-				//go StartRecurrentlyScheduler(&scheduleItem)
-			}
-		}
-	}()
-
-	runConsumer()
+	StartOnetimeScheduler()
+	StartConsumer()
 }
 
 var conn *consumers.Consumer
 
-func runConsumer() {
+func StartConsumer() {
 	amqpConfig := amqpString["amqp"].(map[string]interface{})
 	amqpUri := fmt.Sprintf("amqp://%s:%s@%s:%s%s",
 		amqpConfig["user"].(string),
@@ -125,7 +116,8 @@ func runConsumer() {
 func handler(deliveries <-chan amqp.Delivery) {
 
 	for d := range deliveries {
-		RunSchedulerTask(d)
+		d.Ack(false)
+		StartOnetimeScheduler()
 	}
 }
 
@@ -139,22 +131,9 @@ func RunSchedulerTask(d amqp.Delivery) {
 	var message map[string]interface{}
 	json.Unmarshal(body, &message)
 
-	// Результат полученный из базы
-	resultSet, err := database.SelectCurrentScheduler()
+	fmt.Printf("Count of entries=%d, and Status running=%t\n", cronJob.w.EntriesCount(), cronJob.w.IsRunning())
 
-	if( err != nil ){
-		fmt.Println("Bad response must be requeue")
-		d.Ack(true)
-	}
-
-	for _, scheduleItem := range resultSet {
-		if ( scheduleItem.Type == "onetime" ){
-			scheduleTaskItem := scheduleItem
-			go StartOnetimeScheduler(scheduleTaskItem)
-		}else {
-			//go StartRecurrentlyScheduler(&scheduleItem)
-		}
-	}
+	StartOnetimeScheduler()
 
 	d.Ack(false)
 }
@@ -180,15 +159,38 @@ func StartRecurrentlyScheduler(scheduleTask *model.ScheduleTask) {
 	//835, 817, 829, 832, 796, 802,  808
 }
 
-func StartOnetimeScheduler(scheduleTask model.ScheduleTask) {
+func StartOnetimeScheduler() {
 
+	resultSet, err := database.SelectCurrentScheduler()
+
+	if( err != nil ){
+		fmt.Println("Error to get data from Db", err)
+	}
+
+	for _, scheduleItem := range resultSet {
+		if ( scheduleItem.Type == "onetime" ){
+			scheduleTaskItem := scheduleItem
+			cronJob.w.AddFunc("*/5 * * * * *", scheduleTaskItem.Id, func() {
+				go runOnetime(scheduleTaskItem.Id)
+			})
+
+		}else {
+			//go StartRecurrentlyScheduler(&scheduleItem)
+		}
+	}
+	/*
+	scheduleTask, _ := database.GetSchedulerById(scheduleTaskId)
 	publisherConfig := amqpString["publisher"].(map[string]interface{})
 
-	lastRun := scheduleTask.LastRun
-	fromDate := scheduleTask.FromDatetime
+	lastRun, _ := time.Parse("2006-01-02 15:04:00", scheduleTask.LastRun.Format("2006-01-02 15:04:00"))
+	fromDate, _ := time.Parse("2006-01-02 15:04:00", scheduleTask.FromDatetime.Format("2006-01-02 15:04:00"))
+	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
+
+	fmt.Printf("Cronjob will be running with Id=%d, Lastrundate=%v, Fromdatetime=%v, Now=%v\n ", cronJob.w.EntryById(scheduleTask.Id), lastRun, fromDate, now)
 
 	if ( lastRun.Before(fromDate) ){
 
+		fmt.Println("Lastrun date is before fromDatetime", lastRun, fromDate)
 		users, err := database.GetActiveUsers(scheduleTask.Delivery.UserIds, scheduleTask.Delivery.Filter)
 
 		if ( err != nil ) {
@@ -197,8 +199,31 @@ func StartOnetimeScheduler(scheduleTask model.ScheduleTask) {
 
 		publisherQueue := publisher.NewPublisher(conn.GetConnection())
 
-		onetimeSchedule := schedule.NewOnetime(scheduleTask, users)
+		onetimeSchedule := schedule.NewOnetime(scheduleTask, users, cronJob.w)
 		onetimeSchedule.SetAmqp(publisherQueue)
 		onetimeSchedule.Run(publisherConfig)
 	}
+	*/
+
+}
+
+func runOnetime(scheduleTaskId int) {
+	scheduleTask, _ := database.GetSchedulerById(scheduleTaskId)
+	if ( scheduleTask == nil ) {
+		cronJob.w.RemoveFunc(scheduleTaskId)
+	}
+
+	publisherConfig := amqpString["publisher"].(map[string]interface{})
+
+	users, err := database.GetActiveUsers(scheduleTask.Delivery.UserIds, scheduleTask.Delivery.Filter)
+
+	if ( err != nil ) {
+		fmt.Println("Error to get users by params", err)
+	}
+
+	publisherQueue := publisher.NewPublisher(conn.GetConnection())
+
+	onetimeSchedule := schedule.NewOnetime(scheduleTask, users, cronJob.w)
+	onetimeSchedule.SetAmqp(publisherQueue)
+	onetimeSchedule.Run(publisherConfig)
 }

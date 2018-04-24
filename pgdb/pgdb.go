@@ -57,7 +57,7 @@ func (pgmodel *PgDB) logSqlEvent() {
 // Select active Record massAction from DB
 // And return []map[string] of the ResultSets
 func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
-	timeNow := time.Now().UTC()
+	timeNow, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 	scheduleRepository := model.NewScheduleRepository()
 	scheduleModel := scheduleRepository.GetTaskModel()
 
@@ -87,6 +87,27 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 
 	return scheduleModel, nil
 
+}
+
+func (pgmodel *PgDB) GetSchedulerById(modelId int) (*model.ScheduleTask, error) {
+	scheduleModel := &model.ScheduleTask{Id: modelId}
+	err := pgmodel.db.Model(scheduleModel).
+		ColumnExpr("schedule_task.*").
+		ColumnExpr("delivery.title AS delivery__title").
+		ColumnExpr("delivery.text AS delivery__text").
+		ColumnExpr("delivery.user_ids AS delivery__user_ids").
+		ColumnExpr("delivery.id AS delivery__id").
+		ColumnExpr("delivery.filter AS delivery__filter").
+		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
+		Where("schedule_task.id = ?", modelId).
+		Select()
+
+	if err != nil {
+		fmt.Println("Error to get data from scheduler_task", err)
+		return nil, err
+	}
+
+	return scheduleModel, nil
 }
 
 // Get users by params
