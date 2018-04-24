@@ -11,6 +11,7 @@ import (
 	"strings"
 	"regexp"
 	"strconv"
+
 )
 
 const TIME_FORMAT = "2006-01-02"
@@ -64,6 +65,7 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 	err := pgmodel.db.Model(&scheduleModel).
 		ColumnExpr("schedule_task.*").
 		ColumnExpr("delivery.title AS delivery__title").
+		ColumnExpr("delivery.text AS delivery__text").
 		ColumnExpr("delivery.user_ids AS delivery__user_ids").
 		ColumnExpr("delivery.id AS delivery__id").
 		ColumnExpr("delivery.filter AS delivery__filter").
@@ -89,7 +91,7 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 }
 
 // Get users by params
-func (pgmodel *PgDB) GetActiveUsers(userIds []int, filter []model.Filter) ([]*model.Users, error) {
+func (pgmodel *PgDB) GetActiveUsers(userIds string, filter []model.Filter) ([]*model.Users, error) {
 	userRepository := model.NewUserRepository()
 	userModel := userRepository.GetUserModel()
 
@@ -99,8 +101,22 @@ func (pgmodel *PgDB) GetActiveUsers(userIds []int, filter []model.Filter) ([]*mo
 		Join("INNER JOIN talkbank_bots.messenger_users AS messenger_users ON messenger_users.user_id = users.id").
 		Where("messenger_users.is_active = ?", true)
 
-	if ( userIds[0] != 0 ) {
-		query = query.Where("users.id IN (?)", pg.In(userIds))
+	if( userIds != "" ){
+		users, ok := parseStringUserIds(userIds)
+		var usersIn = []int{}
+		if( ok == true ){
+			for _, usersId := range users {
+				if( len(usersId) > 1 ){
+					query = query.Where("users.id BETWEEN ? AND ?", usersId[0], usersId[1])
+				}else{
+					usersIn = append(usersIn, usersId[0])
+				}
+			}
+
+			if( len(usersIn) > 0 ){
+				query = query.Where("users.id IN (?)", pg.In(usersIn))
+			}
+		}
 	}
 
 	var i int
@@ -122,6 +138,36 @@ func (pgmodel *PgDB) GetActiveUsers(userIds []int, filter []model.Filter) ([]*mo
 
 	return userModel, nil
 
+}
+
+func parseStringUserIds(users string) ([][]int, bool) {
+
+	var userIds = [][]int{}
+	userStringIds := strings.Split(strings.Trim(users, " "), ",")
+
+	if( len(userStringIds) > 0 && userStringIds[0] != "" ){
+		for _, userId := range userStringIds {
+			trimStringUserId := strings.Trim(userId, " ")
+			valueRegex := regexp.MustCompile("^([\\d]+).*[^\\d]([\\d]+)")
+			match := valueRegex.FindStringSubmatch(trimStringUserId)
+			between := make([]int, 2)
+			if( len(match) > 2 ){
+				between[0], _ = strconv.Atoi(match[1])
+				between[1], _ = strconv.Atoi(match[2])
+
+				userIds = append(userIds, between)
+			}else{
+				userId, _ := strconv.Atoi(trimStringUserId)
+				userIds = append(userIds, []int{userId})
+			}
+		}
+
+
+
+		return userIds, true
+	}
+
+	return nil, false
 }
 
 func (pgmodel *PgDB) GetFilterQuery(query *orm.Query, filters []model.Filter) (*orm.Query, int) {

@@ -15,5 +15,10 @@
         "queueName": "massaction.tasks",
         "exchangeType": "direct"
     },
-    "threads": 8
+    "threads": 8,
+    "publisher": {
+        "queue_onetime": "core.massaction.onetime",
+        "queue_recurrently": "core.massaction.recurrently",
+        "queue_statistic": "core.massaction.statistic"
+    }
 }
