@@ -13,7 +13,7 @@ type Parameters interface {
 
 type Users struct{
 	tableName struct{} `sql:"talkbank_bots.users"`
-	Id int64 `sql:",pk"`
+	Id int `sql:",pk"`
 	Hash string `sql:"type:varchar(16),unique:users_hash_key"`
 	FirstName string
 	LastName string
@@ -22,7 +22,7 @@ type Users struct{
 	IsIdentified bool
 	IsActivated bool
 	ChildId int
-	MessengerId int64
+	MessengerId int
 	CoreId int
 	CreatedAt time.Time `sql:"default:now()"`
 	UpdatedAt time.Time
@@ -31,7 +31,7 @@ type Users struct{
 
 type UserMessenger struct{
 	tableName struct{} `sql:"talkbank_bots.messenger_users"`
-	Id int64 `sql:",pk"`
+	Id int `sql:",pk"`
 	Messenger string `sql:"type:varchar(32)"`
 	IsMain bool
 	ChatId string
@@ -43,7 +43,7 @@ type UserMessenger struct{
 	CreatedAt time.Time `sql:"default:now()"`
 	UpdatedAt time.Time
 	User *Users
-	UserId int64
+	UserId int
 
 }
 

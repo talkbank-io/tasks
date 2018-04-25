@@ -14,8 +14,8 @@ type Filter struct{
 // DB Model for table schedule_task
 type ScheduleTask struct {
 	tableName struct{} `sql:"talkbank_bots.schedule_task"`
-	Id int64 `sql:"id"`
-	ActionId int64
+	Id int `sql:"id"`
+	ActionId int
 	Type  string `sql:"type:talkbank_bots.SCHEDULE_TASK_TYPE"`
 	Category string
 	Template  string
@@ -34,7 +34,7 @@ type ScheduleTask struct {
 // DB Model for table delivery
 type Delivery struct {
 	tableName struct{} `sql:"talkbank_bots.delivery"`
-	Id int64 `sql:"id"`
+	Id int `sql:"id"`
 	Text string
 	Title string
 	Description string
@@ -42,7 +42,7 @@ type Delivery struct {
 	CountUsers int `sql:"countUsers"`
 	Sent int
 	LastSending time.Time `sql:"lastSending"`
-	CategoryId int64
+	CategoryId int
 	TimeCondition string `sql:"timeCondition"`
 	ParametersCondition string `sql:"parametersCondition"`
 	CreatedAt time.Time `sql:"default:now()"`

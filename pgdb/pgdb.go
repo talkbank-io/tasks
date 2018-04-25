@@ -11,6 +11,7 @@ import (
 	"strings"
 	"regexp"
 	"strconv"
+	"sort"
 
 )
 
@@ -29,7 +30,7 @@ type PgDB struct {
 
 // Create new Struct of PgDB
 // and connect to database
-func NewPgDB(config map[string]string) PgDB {
+func NewPgDB(config map[string]string) *PgDB {
 	pgmodel := &PgDB{}
 	pgmodel.db = pg.Connect(&pg.Options{
 		Network: "tcp",
@@ -40,7 +41,7 @@ func NewPgDB(config map[string]string) PgDB {
 	})
 
 	pgmodel.logSqlEvent()
-	return *pgmodel
+	return pgmodel
 }
 
 // Initialize log event with SQL
@@ -55,10 +56,21 @@ func (pgmodel *PgDB) logSqlEvent() {
 	})
 }
 
+/*
+SELECT schedule_task.*, delivery.title AS delivery__title, delivery.text AS delivery__text,
+  delivery.user_ids AS delivery__user_ids, delivery.id AS delivery__id, delivery.filter AS delivery__filter
+FROM talkbank_bots.schedule_task AS "schedule_task"
+  INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id
+WHERE (schedule_task.is_active = TRUE) AND (schedule_task.from_datetime >= '2018-04-25 08:31:00+00:00:00')
+      AND ((schedule_task.to_datetime IS NULL) OR (schedule_task.to_datetime <= schedule_task.from_datetime))
+ORDER BY "schedule_task"."id" ASC
+*/
+
 // Select active Record massAction from DB
 // And return []map[string] of the ResultSets
 func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
-	timeNow := time.Now().UTC()
+
+	timeNow, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 	scheduleRepository := model.NewScheduleRepository()
 	scheduleModel := scheduleRepository.GetTaskModel()
 
@@ -71,13 +83,12 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 		ColumnExpr("delivery.filter AS delivery__filter").
 		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
 		Where("schedule_task.is_active = ?", true).
-		Where("schedule_task.from_datetime <= ?", timeNow).
+		Where("schedule_task.from_datetime >= ?", timeNow).
 		WhereGroup(func(q *orm.Query) (*orm.Query, error) {
-		return q.
-		WhereOr("schedule_task.to_datetime IS NULL").
-			WhereOr("schedule_task.to_datetime >= ?", timeNow), nil
-	}).
-	//Group("delivery__title", "delivery.user_ids", "delivery.id", "schedule_task.id").
+			return q.
+				WhereOr("schedule_task.to_datetime IS NULL").
+				WhereOr("schedule_task.to_datetime >= schedule_task.from_datetime"), nil
+		}).
 		Order("schedule_task.id ASC").
 		Select()
 
@@ -88,6 +99,27 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 
 	return scheduleModel, nil
 
+}
+
+func (pgmodel *PgDB) GetSchedulerById(modelId int) (*model.ScheduleTask, error) {
+	scheduleModel := &model.ScheduleTask{Id: modelId}
+	err := pgmodel.db.Model(scheduleModel).
+		ColumnExpr("schedule_task.*").
+		ColumnExpr("delivery.title AS delivery__title").
+		ColumnExpr("delivery.text AS delivery__text").
+		ColumnExpr("delivery.user_ids AS delivery__user_ids").
+		ColumnExpr("delivery.id AS delivery__id").
+		ColumnExpr("delivery.filter AS delivery__filter").
+		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
+		Where("schedule_task.id = ?", modelId).
+		Select()
+
+	if err != nil {
+		fmt.Println("Error to get data from scheduler_task", err)
+		return nil, err
+	}
+
+	return scheduleModel, nil
 }
 
 // Get users by params
@@ -107,6 +139,7 @@ func (pgmodel *PgDB) GetActiveUsers(userIds string, filter []model.Filter) ([]*m
 		if( ok == true ){
 			for _, usersId := range users {
 				if( len(usersId) > 1 ){
+					sort.Ints(usersId)
 					query = query.Where("users.id BETWEEN ? AND ?", usersId[0], usersId[1])
 				}else{
 					usersIn = append(usersIn, usersId[0])
@@ -276,3 +309,8 @@ func (pgmodel *PgDB) collectPathReference(path string) string {
 	return lastFieldName
 }
 
+func FormatTime(t time.Time) string {
+	return fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d",
+		t.Year(), t.Month(), t.Day(),
+		t.Hour(), t.Minute(), t.Second())
+}
