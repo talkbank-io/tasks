@@ -6,14 +6,13 @@ import (
 	"encoding/json"
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/publisher"
-	"github.com/killer-djon/tasks/cron"
+	"github.com/killer-djon/tasks/pgdb"
 )
 
 type Onetime struct {
-	row   *model.ScheduleTask
-	users []*model.Users
-	pub   *publisher.Publisher
-	cronJob *cron.Cron
+	row     model.ScheduleTask
+	users   []*model.Users
+	pub     *publisher.Publisher
 }
 
 type QueueMessage struct {
@@ -30,23 +29,35 @@ type FinalizeMessage struct {
 	ScheduleId     int
 }
 
-// Constructor
-func NewOnetime(scheduleModel *model.ScheduleTask, users []*model.Users, cronJob *cron.Cron) *Onetime {
+func NewOnetime(scheduleModel model.ScheduleTask, pub *publisher.Publisher) *Onetime {
 	return &Onetime{
 		row: scheduleModel,
-		users: users,
-		cronJob: cronJob,
+		pub: pub,
 	}
 }
 
-func (schedule *Onetime) Run(publisherConfig map[string]interface{}) {
+func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *pgdb.PgDB) map[string]int {
+
 	lastRun, _ := time.Parse("2006-01-02 15:04:00", schedule.row.LastRun.Format("2006-01-02 15:04:00"))
 	fromDate, _ := time.Parse("2006-01-02 15:04:00", schedule.row.FromDatetime.Format("2006-01-02 15:04:00"))
-	//now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
+	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 
-	if( lastRun.Before(fromDate) || lastRun.Equal(fromDate) ) {
+	fmt.Printf("Start cronjob with ID=%d, LastRun=%v, FromDateTime=%v, Now=%v\n", schedule.row.Id, lastRun, fromDate, now)
+
+	var result = make(map[string]int, 2)
+
+	if ( fromDate.Equal(now) ) {
+		fmt.Println("Fromdatetimw is equal with now and must be run", fromDate, now)
+
+		users, err := database.GetActiveUsers(schedule.row.Delivery.UserIds, schedule.row.Delivery.Filter)
+
+		if ( err != nil ) {
+			fmt.Println("Error to get users by params", err)
+			return result
+		}
+
 		countPublishing := 0
-		for _, user := range schedule.users {
+		for _, user := range users {
 			q_message := &QueueMessage{
 				UserId: user.Id,
 				TaskId: schedule.row.Id,
@@ -71,39 +82,36 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}) {
 			countPublishing++
 
 			fmt.Println("Message will be publish:", isPublish)
-
 		}
 
-		if ( countPublishing == len(schedule.users) ) {
-
-			finalize := &FinalizeMessage{
-				CoverageCount:  len(schedule.users),
-				PublishCount: countPublishing,
-				UnpublishCount: len(schedule.users) - countPublishing,
-				ScheduleId: schedule.row.Id,
-			}
-
-			finalize_message, err := json.Marshal(finalize)
-			if err != nil {
-				fmt.Println("error:", err)
-			}
-
-			channel := schedule.pub
-			isPublish, err := channel.Publish(publisherConfig["queue_statistic"].(string), finalize_message)
-
-			if err != nil {
-				fmt.Println("error on publishing:", err)
-			}
-
-			if ( isPublish == true ) {
-				fmt.Println("Publish statistic info to queue will send", finalize)
-				fmt.Println("Cronjob must be removed from queue of crons with ID:", schedule.row.Id)
-				fmt.Printf("Count of cronjobs=%d", schedule.cronJob.EntriesCount())
-				schedule.cronJob.RemoveFunc(schedule.row.Id)
-
-			}
-		}
+		result["countPublishing"] = countPublishing
+		result["lenUsers"] = len(users)
 	}
+
+	return result
+}
+
+func (schedule *Onetime) SendTransmitStatistic(publisherConfig map[string]interface{}, result map[string]int) bool {
+	finalize := &FinalizeMessage{
+		CoverageCount:  result["lenUsers"],
+		PublishCount: result["countPublishing"],
+		UnpublishCount: result["lenUsers"] - result["countPublishing"],
+		ScheduleId: schedule.row.Id,
+	}
+
+	finalize_message, err := json.Marshal(finalize)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+
+	channel := schedule.pub
+	isPublish, err := channel.Publish(publisherConfig["queue_statistic"].(string), finalize_message)
+
+	if err != nil {
+		fmt.Println("error on publishing:", err)
+	}
+
+	return isPublish
 }
 
 func (schedule *Onetime) SetAmqp(pub *publisher.Publisher) {
