@@ -5,11 +5,6 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"runtime"
-	"time"
-	//"strings"
-	//"strconv"
-	//"github.com/elgs/cron"
-
 	"github.com/killer-djon/cron"
 	"fmt"
 	"github.com/streadway/amqp"
@@ -164,10 +159,11 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 		publish := onetimeSchedule.SendTransmitStatistic(publisherConfig, result)
 		if( publish == true ){
 			fmt.Printf(
-				"Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d\n",
+				"Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
 				scheduleTask.Id,
 				result["lenUsers"],
-				result["countPublishing"])
+				result["countPublishing"],
+				result["countUnPublished"])
 			cronJob.w.RemoveFunc(scheduleTask.Id)
 		}
 	}

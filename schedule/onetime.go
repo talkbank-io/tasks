@@ -11,9 +11,9 @@ import (
 )
 
 type Onetime struct {
-	row     model.ScheduleTask
-	users   []*model.Users
-	pub     *publisher.Publisher
+	row   model.ScheduleTask
+	users []*model.Users
+	pub   *publisher.Publisher
 }
 
 type QueueMessage struct {
@@ -21,6 +21,7 @@ type QueueMessage struct {
 	TaskId       int
 	MassActionId int
 	Text         string
+	Coverage     int
 }
 
 type FinalizeMessage struct {
@@ -37,7 +38,6 @@ func NewOnetime(scheduleModel model.ScheduleTask, pub *publisher.Publisher) *One
 	}
 }
 
-
 func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *pgdb.PgDB, cronJob *cron.Cron) map[string]int {
 
 	lastRun, _ := time.Parse("2006-01-02 15:04:00", schedule.row.LastRun.Format("2006-01-02 15:04:00"))
@@ -49,7 +49,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *p
 	var result = make(map[string]int, 2)
 
 	if ( fromDate.Equal(now) ) {
-		fmt.Println("Fromdatetimw is equal with now and must be run", fromDate, now)
+		start := time.Now()
 		fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
 		cronJob.PauseFunc(schedule.row.Id)
 
@@ -61,12 +61,15 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *p
 		}
 
 		countPublishing := 0
+		countUnPublished := 0
+
 		for _, user := range users {
 			q_message := &QueueMessage{
 				UserId: user.Id,
 				TaskId: schedule.row.Id,
 				MassActionId: schedule.row.Delivery.Id,
 				Text: schedule.row.Delivery.Text,
+				Coverage: len(users),
 			}
 
 			fmt.Println("Will be publis data:", q_message)
@@ -74,6 +77,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *p
 			message, err := json.Marshal(q_message)
 			if err != nil {
 				fmt.Println("error:", err)
+				countUnPublished++
 			}
 
 			channel := schedule.pub
@@ -81,15 +85,21 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *p
 
 			if err != nil {
 				fmt.Println("error on publishing:", err)
+				countUnPublished++
 			}
 
 			countPublishing++
-
 			fmt.Println("Message will be publish:", isPublish)
 		}
 
 		result["countPublishing"] = countPublishing
+		result["countUnPublished"] = countUnPublished
 		result["lenUsers"] = len(users)
+
+		end := time.Now()
+		difference := end.Sub(start)
+
+		fmt.Printf("Time to resolve task: %v\n", difference)
 	}
 
 	return result
