@@ -56,6 +56,24 @@ func (pgmodel *PgDB) logSqlEvent() {
 	})
 }
 
+func (pgmodel *PgDB) SetHashAction(Id int, hash string) (string, error) {
+
+	//res, err := pgmodel.db.Model(model.Delivery).Set("action_hash = ?title").Where("id = ?id").Update()
+	var hashString string
+	_, err := pgmodel.db.Model(&model.Delivery{}).
+		Set("action_hash = ?", hash).
+		Where("id = ?", Id).
+		Returning("action_hash").
+		Update(&hashString)
+
+	if( err != nil ) {
+		fmt.Println("ERror on update item", Id, err)
+		return "", err
+	}
+
+	return hashString, nil
+}
+
 /*
 SELECT schedule_task.*, delivery.title AS delivery__title, delivery.text AS delivery__text,
   delivery.user_ids AS delivery__user_ids, delivery.id AS delivery__id, delivery.filter AS delivery__filter

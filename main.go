@@ -152,8 +152,8 @@ func StartOnetimeScheduler() {
 func runOnetime(scheduleTask model.ScheduleTask) {
 	publisherConfig := amqpString["publisher"].(map[string]interface{})
 	publisherQueue := publisher.NewPublisher(conn.GetConnection())
-	onetimeSchedule := schedule.NewOnetime(scheduleTask, publisherQueue)
-	result := onetimeSchedule.Run(publisherConfig, database, cronJob.w)
+	onetimeSchedule := schedule.NewOnetime(scheduleTask, publisherQueue, database)
+	result := onetimeSchedule.Run(publisherConfig, cronJob.w)
 
 	if( len(result) > 0 ){
 		publish := onetimeSchedule.SendTransmitStatistic(publisherConfig, result)

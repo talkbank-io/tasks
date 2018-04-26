@@ -1,7 +1,10 @@
 package schedule
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
+	"strconv"
 	"time"
 	"encoding/json"
 	"github.com/killer-djon/tasks/model"
@@ -14,6 +17,7 @@ type Onetime struct {
 	row   model.ScheduleTask
 	users []*model.Users
 	pub   *publisher.Publisher
+	db	*pgdb.PgDB
 }
 
 type QueueMessage struct {
@@ -22,6 +26,7 @@ type QueueMessage struct {
 	MassActionId int
 	Text         string
 	Coverage     int
+	Hash	string
 }
 
 type FinalizeMessage struct {
@@ -31,14 +36,15 @@ type FinalizeMessage struct {
 	ScheduleId     int
 }
 
-func NewOnetime(scheduleModel model.ScheduleTask, pub *publisher.Publisher) *Onetime {
+func NewOnetime(scheduleModel model.ScheduleTask, pub *publisher.Publisher, database *pgdb.PgDB) *Onetime {
 	return &Onetime{
 		row: scheduleModel,
 		pub: pub,
+		db: database,
 	}
 }
 
-func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *pgdb.PgDB, cronJob *cron.Cron) map[string]int {
+func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cron.Cron) map[string]int {
 
 	lastRun, _ := time.Parse("2006-01-02 15:04:00", schedule.row.LastRun.Format("2006-01-02 15:04:00"))
 	fromDate, _ := time.Parse("2006-01-02 15:04:00", schedule.row.FromDatetime.Format("2006-01-02 15:04:00"))
@@ -49,11 +55,19 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *p
 	var result = make(map[string]int, 2)
 
 	if ( fromDate.Equal(now) ) {
+
+		hash, err := schedule.SaveHash()
+		if( err != nil ){
+			fmt.Println(err)
+			cronJob.ResumeFunc(schedule.row.Id)
+			return result
+		}
+
 		start := time.Now()
 		fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
 		cronJob.PauseFunc(schedule.row.Id)
 
-		users, err := database.GetActiveUsers(schedule.row.Delivery.UserIds, schedule.row.Delivery.Filter)
+		users, err := schedule.db.GetActiveUsers(schedule.row.Delivery.UserIds, schedule.row.Delivery.Filter)
 
 		if ( err != nil ) {
 			fmt.Println("Error to get users by params", err)
@@ -70,6 +84,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *p
 				MassActionId: schedule.row.Delivery.Id,
 				Text: schedule.row.Delivery.Text,
 				Coverage: len(users),
+				Hash: hash,
 			}
 
 			fmt.Println("Will be publis data:", q_message)
@@ -104,6 +119,28 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, database *p
 
 	return result
 }
+
+func (schedule *Onetime) SaveHash() (string, error) {
+
+	hash := sha256.New()
+	hash.Write([]byte(time.Now().UTC().Format("2006-01-02 15:04")))
+	hash.Write([]byte(strconv.Itoa(schedule.row.Id)))
+
+	sum := hash.Sum(nil)
+	stringHash := base64.URLEncoding.EncodeToString(sum)
+
+	fmt.Println("NEw hash instance", stringHash, time.Now().UTC().Format("2006-01-02 15:04"))
+
+	hashSet, err := schedule.db.SetHashAction(schedule.row.Delivery.Id, stringHash)
+
+	if( err != nil ){
+		fmt.Println("Error ocurred when update delivery data", err)
+		return "", err
+	}
+
+	return hashSet, nil
+}
+
 
 func (schedule *Onetime) SendTransmitStatistic(publisherConfig map[string]interface{}, result map[string]int) bool {
 	finalize := &FinalizeMessage{
