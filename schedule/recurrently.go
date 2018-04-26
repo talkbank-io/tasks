@@ -3,45 +3,47 @@ package schedule
 import (
 	//"reflect"
 	"fmt"
-	"github.com/elgs/cron"
 	"encoding/json"
 	"github.com/killer-djon/tasks/model"
+	"github.com/killer-djon/tasks/publisher"
+	"github.com/killer-djon/tasks/pgdb"
+	"github.com/killer-djon/cron"
 )
 
 type Template struct {
-	Minute string
-	Hour string
-	Day string
-	Month string
+	Minute  string
+	Hour    string
+	Day     string
+	Month   string
 	Weekday string
 }
 
 type Recurrently struct {
 	template *Template
-	row model.ScheduleTask
+	row      model.ScheduleTask
+	pub      *publisher.Publisher
+	db       *pgdb.PgDB
 }
 
 // Constructor
-func NewRecurrently(scheduleTask model.ScheduleTask) *Recurrently {
+func NewRecurrently(scheduleModel model.ScheduleTask, pub *publisher.Publisher, database *pgdb.PgDB) *Recurrently {
 
 	var result Template
-	json.Unmarshal([]byte(scheduleTask.Template), &result)
+	json.Unmarshal([]byte(scheduleModel.Template), &result)
 
 	return &Recurrently{
-		row: scheduleTask,
 		template: &result,
+		row: scheduleModel,
+		pub: pub,
+		db: database,
 	}
 }
 
 // Запускам задачи по крону от каждой полученной
 // записи из schedule_task
-func (schedule *Recurrently) Print() {
+func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob *cron.Cron) {
 	//minute, _ := strconv.Atoi(schedule.template.Minute)
 
-	cronJob := cron.New()
-	_, err := cronJob.AddFunc("*/10 * * * * *", func() {
-		Action(schedule)
-	} )
 
 	/*fmt.Sprintf("%s %s %s %s %s",
 		schedule.template.Minute,
@@ -51,11 +53,6 @@ func (schedule *Recurrently) Print() {
 		schedule.template.Weekday,
 	)*/
 
-	if ( err != nil ) {
-		fmt.Println("Error to run crontjob recurrently: ", err)
-	}
-
-	cronJob.Start()
 }
 
 func Action(schedule *Recurrently) {

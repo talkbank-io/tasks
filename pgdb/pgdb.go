@@ -75,13 +75,17 @@ func (pgmodel *PgDB) SetHashAction(Id int, hash string) (string, error) {
 }
 
 /*
-SELECT schedule_task.*, delivery.title AS delivery__title, delivery.text AS delivery__text,
-  delivery.user_ids AS delivery__user_ids, delivery.id AS delivery__id, delivery.filter AS delivery__filter
+SELECT schedule_task.*,
+  delivery.title AS delivery__title, delivery.text AS delivery__text,
+  delivery.user_ids AS delivery__user_ids, delivery.id AS delivery__id,
+  delivery.filter AS delivery__filter
 FROM talkbank_bots.schedule_task AS "schedule_task"
   INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id
-WHERE (schedule_task.is_active = TRUE) AND (schedule_task.from_datetime >= '2018-04-25 08:31:00+00:00:00')
-      AND ((schedule_task.to_datetime IS NULL) OR (schedule_task.to_datetime <= schedule_task.from_datetime))
-ORDER BY "schedule_task"."id" ASC
+WHERE (schedule_task.is_active = TRUE)
+      AND (((schedule_task.type = 'onetime') and (schedule_task.from_datetime >= '2018-04-26 13:53:00+00:00:00')
+            and (schedule_task.to_datetime IS NULL) OR (schedule_task.to_datetime >= schedule_task.from_datetime))
+      OR ((schedule_task.type = 'recurrently') AND (schedule_task.from_datetime <= '2018-04-26 13:53:00+00:00:00'))
+         AND (schedule_task.to_datetime IS NULL) or (schedule_task.to_datetime >= '2018-04-26 13:53:00+00:00:00'))
 */
 
 // Select active Record massAction from DB
@@ -101,11 +105,29 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 		ColumnExpr("delivery.filter AS delivery__filter").
 		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
 		Where("schedule_task.is_active = ?", true).
-		Where("schedule_task.from_datetime >= ?", timeNow).
 		WhereGroup(func(q *orm.Query) (*orm.Query, error) {
 			return q.
-				WhereOr("schedule_task.to_datetime IS NULL").
-				WhereOr("schedule_task.to_datetime >= schedule_task.from_datetime"), nil
+				WhereOrGroup(func(subQ1 *orm.Query) (*orm.Query, error){
+					return subQ1.
+						Where("schedule_task.type = ?", "onetime").
+						Where("schedule_task.from_datetime >= ?", timeNow).
+						WhereGroup(func(subQ *orm.Query) (*orm.Query, error) {
+							return subQ.
+								WhereOr("schedule_task.to_datetime IS NULL").
+								WhereOr("schedule_task.to_datetime >= schedule_task.from_datetime"), nil
+						}), nil
+				}).
+				WhereOrGroup(func(subQ2 *orm.Query) (*orm.Query, error){
+					return subQ2.
+						Where("schedule_task.type = ?", "recurrently").
+						Where("schedule_task.from_datetime <= ?", timeNow).
+						WhereGroup(func(subQ *orm.Query) (*orm.Query, error) {
+							return subQ.
+								WhereOr("schedule_task.to_datetime IS NULL").
+								WhereOr("schedule_task.to_datetime >= ?", timeNow).
+								Where("schedule_task.to_datetime > schedule_task.from_datetime", timeNow), nil
+						}), nil
+				}), nil
 		}).
 		Order("schedule_task.id ASC").
 		Select()

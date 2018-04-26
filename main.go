@@ -72,7 +72,7 @@ func parseConfig(configFile string) (map[string]interface{}, error) {
 
 func main() {
 
-	go StartOnetimeScheduler()
+	go StartSchedulersJob()
 	StartConsumer()
 }
 
@@ -116,18 +116,13 @@ func handler(deliveries <-chan amqp.Delivery) {
 
 	for d := range deliveries {
 		d.Ack(false)
-		go StartOnetimeScheduler()
+		go StartSchedulersJob()
 	}
 }
 
-// Запуск планировщика по расписанию
-func StartRecurrentlyScheduler(scheduleTask *model.ScheduleTask) {
-
-}
 
 // Запуск разовой задачи по отправке
-func StartOnetimeScheduler() {
-
+func StartSchedulersJob() {
 	resultSet, err := database.SelectCurrentScheduler()
 
 	if( err != nil ){
@@ -135,18 +130,21 @@ func StartOnetimeScheduler() {
 	}
 
 	for _, scheduleItem := range resultSet {
-		if ( scheduleItem.Type == "onetime" ){
-			scheduleTaskItem := scheduleItem
-
+		scheduleTaskItem := scheduleItem
+		if ( scheduleTaskItem.Type == "onetime" ){
 			cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
 				go runOnetime(scheduleTaskItem)
 			})
 
 		}else {
-			//go StartRecurrentlyScheduler(&scheduleItem)
+			go runRecurrently(scheduleTaskItem)
 		}
 	}
 
+}
+
+func runRecurrently(scheduleTask model.ScheduleTask) {
+	fmt.Println(scheduleTask.Template)
 }
 
 func runOnetime(scheduleTask model.ScheduleTask) {
