@@ -1,10 +1,8 @@
 package schedule
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
+
 	"fmt"
-	"strconv"
 	"time"
 	"encoding/json"
 	"github.com/killer-djon/tasks/model"
@@ -56,7 +54,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 
 	if ( fromDate.Equal(now) ) {
 
-		hash, err := schedule.SaveHash()
+		hash, err := schedule.db.SaveHash(schedule.row.Id, schedule.row.Delivery.Id)
 		if( err != nil ){
 			fmt.Println(err)
 			cronJob.ResumeFunc(schedule.row.Id)
@@ -118,27 +116,6 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 	}
 
 	return result
-}
-
-func (schedule *Onetime) SaveHash() (string, error) {
-
-	hash := sha256.New()
-	hash.Write([]byte(time.Now().UTC().Format("2006-01-02 15:04")))
-	hash.Write([]byte(strconv.Itoa(schedule.row.Id)))
-
-	sum := hash.Sum(nil)
-	stringHash := base64.URLEncoding.EncodeToString(sum)
-
-	fmt.Println("NEw hash instance", stringHash, time.Now().UTC().Format("2006-01-02 15:04"))
-
-	hashSet, err := schedule.db.SetHashAction(schedule.row.Delivery.Id, stringHash)
-
-	if( err != nil ){
-		fmt.Println("Error ocurred when update delivery data", err)
-		return "", err
-	}
-
-	return hashSet, nil
 }
 
 

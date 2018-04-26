@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"log"
 	"time"
-
+	"crypto/sha256"
+	"encoding/base64"
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
 	"github.com/killer-djon/tasks/model"
@@ -74,25 +75,36 @@ func (pgmodel *PgDB) SetHashAction(Id int, hash string) (string, error) {
 	return hashString, nil
 }
 
+func (pgmodel *PgDB) SaveHash(scheduleId, deliveryId int) (string, error) {
+
+	hash := sha256.New()
+	hash.Write([]byte(time.Now().UTC().Format("2006-01-02 15:04")))
+	hash.Write([]byte(strconv.Itoa(scheduleId)))
+
+	sum := hash.Sum(nil)
+	stringHash := base64.URLEncoding.EncodeToString(sum)
+
+	fmt.Println("New hash instance", stringHash, time.Now().UTC().Format("2006-01-02 15:04"))
+
+	hashSet, err := pgmodel.SetHashAction(deliveryId, stringHash)
+
+	if( err != nil ){
+		fmt.Println("Error ocurred when update delivery data", err)
+		return "", err
+	}
+
+	return hashSet, nil
+}
+
 /*
-SELECT schedule_task.*,
-  delivery.title AS delivery__title, delivery.text AS delivery__text,
-  delivery.user_ids AS delivery__user_ids, delivery.id AS delivery__id,
-  delivery.filter AS delivery__filter
-FROM talkbank_bots.schedule_task AS "schedule_task"
-  INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id
-WHERE (schedule_task.is_active = TRUE)
-      AND (((schedule_task.type = 'onetime') and (schedule_task.from_datetime >= '2018-04-26 13:53:00+00:00:00')
-            and (schedule_task.to_datetime IS NULL) OR (schedule_task.to_datetime >= schedule_task.from_datetime))
-      OR ((schedule_task.type = 'recurrently') AND (schedule_task.from_datetime <= '2018-04-26 13:53:00+00:00:00'))
-         AND (schedule_task.to_datetime IS NULL) or (schedule_task.to_datetime >= '2018-04-26 13:53:00+00:00:00'))
+SELECT schedule_task.*, delivery.title AS delivery__title, delivery.text AS delivery__text, delivery.user_ids AS delivery__user_ids, delivery.id AS delivery__id, delivery.filter AS delivery__filter FROM talkbank_bots.schedule_task AS "schedule_task" INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id WHERE (schedule_task.is_active = TRUE) AND (((schedule_task.type = 'onetime') AND (schedule_task.from_datetime >= '2018-04-26 18:29:00') AND ((schedule_task.to_datetime IS NULL) OR (schedule_task.to_datetime >= schedule_task.from_datetime))) OR ((schedule_task.type = 'recurrently') AND (schedule_task.from_datetime <= '2018-04-26 18:29:00') AND ((schedule_task.to_datetime IS NULL) OR ((schedule_task.to_datetime >= '2018-04-26 18:29:00') AND (schedule_task.to_datetime > schedule_task.from_datetime))))) ORDER BY "schedule_task"."id" ASC
 */
 
 // Select active Record massAction from DB
 // And return []map[string] of the ResultSets
 func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
+	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 
-	timeNow, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 	scheduleRepository := model.NewScheduleRepository()
 	scheduleModel := scheduleRepository.GetTaskModel()
 
@@ -110,7 +122,7 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 				WhereOrGroup(func(subQ1 *orm.Query) (*orm.Query, error){
 					return subQ1.
 						Where("schedule_task.type = ?", "onetime").
-						Where("schedule_task.from_datetime >= ?", timeNow).
+						Where("schedule_task.from_datetime >= ?", now).
 						WhereGroup(func(subQ *orm.Query) (*orm.Query, error) {
 							return subQ.
 								WhereOr("schedule_task.to_datetime IS NULL").
@@ -120,12 +132,16 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 				WhereOrGroup(func(subQ2 *orm.Query) (*orm.Query, error){
 					return subQ2.
 						Where("schedule_task.type = ?", "recurrently").
-						Where("schedule_task.from_datetime <= ?", timeNow).
+						Where("schedule_task.from_datetime <= ?", now).
 						WhereGroup(func(subQ *orm.Query) (*orm.Query, error) {
 							return subQ.
 								WhereOr("schedule_task.to_datetime IS NULL").
-								WhereOr("schedule_task.to_datetime >= ?", timeNow).
-								Where("schedule_task.to_datetime > schedule_task.from_datetime", timeNow), nil
+								//WhereOr("schedule_task.to_datetime >= ?", now), nil
+								WhereOrGroup(func(subQ1 *orm.Query) (*orm.Query, error){
+									return subQ1.
+										Where("schedule_task.to_datetime >= ?", now).
+										Where("schedule_task.to_datetime > schedule_task.from_datetime"), nil
+								}), nil
 						}), nil
 				}), nil
 		}).

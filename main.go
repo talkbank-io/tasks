@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	CRON_ONETIME_FORMAT = "1 * * * * *" // every minutes
-	CRON_RECURRENTLY_FORMAT = ""
+	CRON_ONETIME_FORMAT = "0 * * * * *" // every minutes
 )
 
 // Parse json config file
@@ -129,6 +128,8 @@ func StartSchedulersJob() {
 		fmt.Println("Error to get data from Db", err)
 	}
 
+	fmt.Println("Len of the records:", len(resultSet))
+
 	for _, scheduleItem := range resultSet {
 		scheduleTaskItem := scheduleItem
 		if ( scheduleTaskItem.Type == "onetime" ){
@@ -137,14 +138,45 @@ func StartSchedulersJob() {
 			})
 
 		}else {
-			go runRecurrently(scheduleTaskItem)
+			var resultTemplate = make(map[string]string)
+			json.Unmarshal([]byte(scheduleTaskItem.Template), &resultTemplate)
+
+			cronTemplate := fmt.Sprintf("0 %s %s %s %s %s",
+				resultTemplate["minute"],
+				resultTemplate["hour"],
+				resultTemplate["day"],
+				resultTemplate["month"],
+				resultTemplate["weekday"],
+			)
+
+			cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
+				go runRecurrently(scheduleTaskItem, cronTemplate)
+			})
 		}
 	}
 
 }
 
-func runRecurrently(scheduleTask model.ScheduleTask) {
-	fmt.Println(scheduleTask.Template)
+func runRecurrently(scheduleTask model.ScheduleTask, template string) {
+	publisherConfig := amqpString["publisher"].(map[string]interface{})
+	publisherQueue := publisher.NewPublisher(conn.GetConnection())
+
+	recurrentlyScheduler := schedule.NewRecurrently(scheduleTask, publisherQueue, database)
+	result := recurrentlyScheduler.Run(publisherConfig, cronJob.w)
+
+	if( len(result) > 0 ) {
+		publish := recurrentlyScheduler.SendTransmitStatistic(publisherConfig, result)
+		if( publish == true ){
+			fmt.Printf(
+				"Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
+				scheduleTask.Id,
+				result["lenUsers"],
+				result["countPublishing"],
+				result["countUnPublished"])
+
+			cronJob.w.RemoveFunc(scheduleTask.Id)
+		}
+	}
 }
 
 func runOnetime(scheduleTask model.ScheduleTask) {
