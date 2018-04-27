@@ -10,10 +10,11 @@ import (
 	"github.com/killer-djon/cron"
 )
 
+
 type Recurrently struct {
-	row      model.ScheduleTask
-	pub      *publisher.Publisher
-	db       *pgdb.PgDB
+	row model.ScheduleTask
+	pub *publisher.Publisher
+	db  *pgdb.PgDB
 }
 
 // Constructor
@@ -32,45 +33,20 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 	entry := cronJob.EntryById(schedule.row.Id)
 
 	fmt.Printf("Recurrently entry to be runned: Next time=%v, Current time=%v\n", entry.Next.UTC(), entry.Prev.UTC())
-	//lastRun := time.Parse("2006-01-02 15:04:00", schedule.row.LastRun.Format("2006-01-02 15:04:00"))
 	nextRun, _ := time.Parse("2006-01-02 15:04:00", schedule.row.NextRun.Format("2006-01-02 15:04:00"))
 	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 
-	/*
-	$template = TaskIntervalHandler::arrayToTemplate($task->template, $task->from_datetime);
-            $cron = CronExpression::factory($template);
-
-            $task->next_run = $cron->getNextRunDate();
-
-            // Ближайщая дата запуска
-            $localDT = $cron->getNextRunDate($now->copy()->subMinute(1));
-
-            if ($task->last_run && $task->last_run >= $localDT) {
-                \Log::debug("Task $taskId was completed.");
-                return false;
-            }
-
-            When do this work
-            lastRun = last run time of the last record
-            nextRun = next run is the lastTime of the cron job + lastRun time
-
-            and in the next time run we must check
-            if nextRun == NOW && lastRun < NOW
-	*/
-
 	var result = make(map[string]int, 2)
 
-	fmt.Printf("Current now=%v, nextRun=%v\n", now, nextRun)
-
-	if( nextRun.Equal(now) ) {
+	if ( nextRun.Equal(now) ) {
 		// Если время следующего запуска совпадает с текущим временем
 		// мы запускаем задачу, стопорим cronjob до момент завершения задачи
 		// потом заного запускаем до следующего ожидания
 		// но при этом надо проверить если nextRun был послденим то мы удаляем job
 		hash, err := schedule.db.SaveHash(schedule.row.Id, schedule.row.Delivery.Id)
-		if( err != nil ){
-			fmt.Println(err)
-			cronJob.ResumeFunc(schedule.row.Id)
+		if ( err != nil ) {
+			fmt.Println("Error on save hash to massAction:", err, schedule.row.Id)
+			cronJob.RemoveFunc(schedule.row.Id)
 			return result
 		}
 
@@ -131,7 +107,6 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 	return result
 
 }
-
 
 func (schedule *Recurrently) SendTransmitStatistic(publisherConfig map[string]interface{}, result map[string]int) bool {
 	finalize := &FinalizeMessage{

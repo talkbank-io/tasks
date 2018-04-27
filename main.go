@@ -5,8 +5,8 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"runtime"
-	"github.com/killer-djon/cron"
 	"fmt"
+	"github.com/killer-djon/cron"
 	"github.com/streadway/amqp"
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/pgdb"
@@ -71,16 +71,17 @@ func parseConfig(configFile string) (map[string]interface{}, error) {
 
 func main() {
 
-	//go StartSchedulersJob()
-	//StartConsumer()
+	go StartSchedulersJob()
+	StartConsumer()
 
-	resultSet, err := database.SelectCurrentScheduler()
+	/*resultSet, err := database.SelectCurrentScheduler()
 
 	if( err != nil ){
 		fmt.Println("Error to get data from Db", err)
 	}
 
 	fmt.Println("Len of the records:", len(resultSet))
+	*/
 }
 
 func StartConsumer() {
@@ -122,9 +123,40 @@ func StartConsumer() {
 func handler(deliveries <-chan amqp.Delivery) {
 
 	for d := range deliveries {
-		d.Ack(false)
+		body := d.Body
+		fmt.Println("TaskWithArgs is executed. message:", string(body))
+
+		//d.Nack(false, true)
 		go StartSchedulersJob()
+		d.Ack(false)
 	}
+
+	/*
+	body := d.Body
+	fmt.Println("TaskWithArgs is executed. message:", string(body))
+
+	var message map[string]interface{}
+	json.Unmarshal(body, &message)
+
+	// Результат полученный из базы
+	resultSet, err := database.SelectCurrentScheduler()
+
+	if( err != nil ){
+		fmt.Println("Bad response must be requeue")
+		d.Nack(false, true)
+	}
+
+	for _, scheduleItem := range resultSet {
+		if ( scheduleItem.Type == "onetime" ){
+			scheduleTaskItem := scheduleItem
+			go StartOnetimeScheduler(scheduleTaskItem)
+		}else {
+			//go StartRecurrentlyScheduler(&scheduleItem)
+		}
+	}
+
+	d.Ack(false)
+	*/
 }
 
 
@@ -138,8 +170,13 @@ func StartSchedulersJob() {
 
 	fmt.Println("Len of the records:", len(resultSet))
 
+	if( len(resultSet) == 0 ) {
+		cronJob.w.ResetJob()
+	}
+
 	for _, scheduleItem := range resultSet {
 		scheduleTaskItem := scheduleItem
+
 		if ( scheduleTaskItem.Type == "onetime" ){
 			cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
 				go runOnetime(scheduleTaskItem)
