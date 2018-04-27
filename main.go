@@ -71,8 +71,16 @@ func parseConfig(configFile string) (map[string]interface{}, error) {
 
 func main() {
 
-	go StartSchedulersJob()
-	StartConsumer()
+	//go StartSchedulersJob()
+	//StartConsumer()
+
+	resultSet, err := database.SelectCurrentScheduler()
+
+	if( err != nil ){
+		fmt.Println("Error to get data from Db", err)
+	}
+
+	fmt.Println("Len of the records:", len(resultSet))
 }
 
 func StartConsumer() {
