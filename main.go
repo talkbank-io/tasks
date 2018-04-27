@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"runtime"
 	"fmt"
-	"github.com/killer-djon/cron"
+	"github.com/killer-djon/tasks/cron"
 	"github.com/streadway/amqp"
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/pgdb"
@@ -124,7 +124,15 @@ func handler(deliveries <-chan amqp.Delivery) {
 
 	for d := range deliveries {
 		body := d.Body
-		fmt.Println("TaskWithArgs is executed. message:", string(body))
+		var message map[string]interface{}
+		json.Unmarshal(body, &message)
+
+		fmt.Println("Incomming message from queue:", message)
+		if( message["is_active"] == false ) {
+			// Если вдруг останов задачи во время исполнения
+			// то мы должны стопорнуть ее, и послать сигнал останова
+
+		}
 
 		//d.Nack(false, true)
 		go StartSchedulersJob()
@@ -171,13 +179,14 @@ func StartSchedulersJob() {
 	fmt.Println("Len of the records:", len(resultSet))
 
 	if( len(resultSet) == 0 ) {
-		cronJob.w.ResetJob()
+		cronJob.w.Reset()
 	}
 
 	for _, scheduleItem := range resultSet {
 		scheduleTaskItem := scheduleItem
 
 		if ( scheduleTaskItem.Type == "onetime" ){
+
 			cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
 				go runOnetime(scheduleTaskItem)
 			})

@@ -8,7 +8,7 @@ import (
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/publisher"
 	"github.com/killer-djon/tasks/pgdb"
-	"github.com/killer-djon/cron"
+	"github.com/killer-djon/tasks/cron"
 )
 
 type Onetime struct {

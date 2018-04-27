@@ -7,7 +7,7 @@ import (
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/publisher"
 	"github.com/killer-djon/tasks/pgdb"
-	"github.com/killer-djon/cron"
+	"github.com/killer-djon/tasks/cron"
 )
 
 
@@ -32,9 +32,14 @@ func NewRecurrently(scheduleModel model.ScheduleTask, pub *publisher.Publisher, 
 func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob *cron.Cron) map[string]int {
 	entry := cronJob.EntryById(schedule.row.Id)
 
-	fmt.Printf("Recurrently entry to be runned: Next time=%v, Current time=%v\n", entry.Next.UTC(), entry.Prev.UTC())
 	nextRun, _ := time.Parse("2006-01-02 15:04:00", schedule.row.NextRun.Format("2006-01-02 15:04:00"))
 	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
+
+	fmt.Printf("Recurrently entry to be runned: Current time=%v, Next time=%v, Now time=%v, Next runtime=%v\n",
+		entry.Prev.UTC(),
+		entry.Next.UTC(),
+		now,
+		nextRun)
 
 	var result = make(map[string]int, 2)
 
