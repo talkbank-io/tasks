@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"runtime"
 	"fmt"
+	"os"
+	"bufio"
 	"github.com/killer-djon/cron"
 	"github.com/streadway/amqp"
 	"github.com/killer-djon/tasks/model"
@@ -31,6 +33,7 @@ type CronJob struct {
 
 var cronJob *CronJob
 var conn *consumers.Consumer
+var writer *bufio.Writer
 
 func init()  {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -70,6 +73,15 @@ func parseConfig(configFile string) (map[string]interface{}, error) {
 
 
 func main() {
+
+	logFile, err := os.OpenFile("/var/log/tasks/tasks.log", os.O_RDWR | os.O_APPEND | os.O_CREATE, 0664)
+	if( err != nil ) {
+		fmt.Printf("ERror on create/open log file=%v\n", err)
+		os.Exit(1)
+	}
+	defer logFile.Close()
+
+	writer = bufio.NewWriter(logFile)
 
 	go StartSchedulersJob()
 	StartConsumer()
@@ -128,6 +140,9 @@ func handler(deliveries <-chan amqp.Delivery) {
 		json.Unmarshal(body, &message)
 
 		fmt.Println("Incomming message from queue:", message)
+		fmt.Fprintf(writer, "Incomming message from queue=%v\n", message)
+		writer.Flush()
+
 		if( message["is_active"] == false ) {
 			// Если вдруг останов задачи во время исполнения
 			// то мы должны стопорнуть ее, и послать сигнал останова
@@ -174,9 +189,13 @@ func StartSchedulersJob() {
 
 	if( err != nil ){
 		fmt.Println("Error to get data from Db", err)
+		fmt.Fprintf(writer, "Error to get data from Db=%v\n", err)
+		writer.Flush()
 	}
 
 	fmt.Println("Len of the records:", len(resultSet))
+	fmt.Fprintf(writer, "Len of the records=%d\n", len(resultSet))
+	writer.Flush()
 
 	if( len(resultSet) == 0 ) {
 		cronJob.w.Reset()
@@ -227,7 +246,12 @@ func runRecurrently(scheduleTask model.ScheduleTask, template string) {
 				result["lenUsers"],
 				result["countPublishing"],
 				result["countUnPublished"])
-
+			fmt.Fprintf(writer, "Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
+				scheduleTask.Id,
+				result["lenUsers"],
+				result["countPublishing"],
+				result["countUnPublished"])
+			writer.Flush()
 			cronJob.w.RemoveFunc(scheduleTask.Id)
 		}
 	}
@@ -248,6 +272,14 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 				result["lenUsers"],
 				result["countPublishing"],
 				result["countUnPublished"])
+
+			fmt.Fprintf(writer, "Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
+				scheduleTask.Id,
+				result["lenUsers"],
+				result["countPublishing"],
+				result["countUnPublished"])
+
+			writer.Flush()
 			cronJob.w.RemoveFunc(scheduleTask.Id)
 		}
 	}
