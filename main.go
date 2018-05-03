@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"runtime"
 	"fmt"
-	"github.com/killer-djon/tasks/cron"
+	"github.com/killer-djon/cron"
 	"github.com/streadway/amqp"
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/pgdb"
