@@ -87,8 +87,18 @@ func main() {
 		os.Exit(1)
 	}
 	defer logFile.Close()
-
 	writer = bufio.NewWriter(logFile)
+
+	cronJob.w.AddFunc(CRON_ONETIME_FORMAT, 0, func() {
+		pendings, err := database.SelectPendingTasks()
+		if( err != nil ){
+			fmt.Fprintf(writer, "Error to get data from PendingTask=%v\n", err)
+			writer.Flush()
+		}
+
+		go runPendingTask(pendings)
+	})
+
 
 	go StartSchedulersJob()
 	StartConsumer()
@@ -204,9 +214,9 @@ func StartSchedulersJob() {
 	fmt.Fprintf(writer, "Len of the records=%d\n", len(resultSet))
 	writer.Flush()
 
-	if( len(resultSet) == 0 ) {
+	/*if( len(resultSet) == 0 ) {
 		cronJob.w.Reset()
-	}
+	}*/
 
 	for _, scheduleItem := range resultSet {
 		scheduleTaskItem := scheduleItem
@@ -233,6 +243,19 @@ func StartSchedulersJob() {
 				go runRecurrently(scheduleTaskItem, cronTemplate)
 			})
 		}
+	}
+
+}
+
+func runPendingTask(pendingTasks []model.PendingTask) {
+	fmt.Println("Length of pending task records:", len(pendingTasks))
+	fmt.Fprintf(writer, "Length of pending task records:", len(pendingTasks))
+	if( len(pendingTasks) > 0 ) {
+		publisherConfig := amqpString["publisher"].(map[string]interface{})
+		publisherQueue := publisher.NewPublisher(conn.GetConnection())
+
+		pendingTaskSchedule := schedule.NewPending(pendingTasks, publisherQueue, database)
+		pendingTaskSchedule.Run(publisherConfig)
 	}
 
 }

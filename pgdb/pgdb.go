@@ -96,6 +96,39 @@ func (pgmodel *PgDB) SaveHash(scheduleId, deliveryId int) (string, error) {
 	return hashSet, nil
 }
 
+// return PendingTask::where('planned', '<=', Carbon::now('UTC'))->get();
+func (pgmodel *PgDB) SelectPendingTasks() ([]model.PendingTask, error) {
+	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
+
+	scheduleRepository := model.NewScheduleRepository()
+	pendingModel := scheduleRepository.GetPendingTaskModel()
+
+
+	err := pgmodel.db.Model(&pendingModel).
+		ColumnExpr("pending_task.*").
+		ColumnExpr("schedule_task.id AS schedule_task__id").
+		ColumnExpr("delivery.id AS delivery__id").
+		ColumnExpr("delivery.text AS delivery__text").
+		/*ColumnExpr("delivery.title AS delivery__title").
+		ColumnExpr("delivery.text AS delivery__text").
+		ColumnExpr("delivery.user_ids AS delivery__user_ids").
+		ColumnExpr("delivery.id AS delivery__id").
+		ColumnExpr("delivery.filter AS delivery__filter").
+		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = pending_task.action_id").
+		*/
+		Join("INNER JOIN talkbank_bots.schedule_task AS schedule_task ON schedule_task.action_id = pending_task.action_id").
+		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
+		Where("pending_task.planned <= ?", now).
+		Select()
+
+	if err != nil {
+		fmt.Println("Error to get data from pending_task", err)
+		return nil, err
+	}
+
+	return pendingModel, nil
+}
+
 /*
 SELECT schedule_task.*, delivery.title AS delivery__title, delivery.text AS delivery__text, delivery.user_ids AS delivery__user_ids, delivery.id AS delivery__id, delivery.filter AS delivery__filter FROM talkbank_bots.schedule_task AS "schedule_task" INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id WHERE (schedule_task.is_active = TRUE) AND (((schedule_task.type = 'onetime') AND (schedule_task.from_datetime >= '2018-04-26 18:29:00') AND ((schedule_task.to_datetime IS NULL) OR (schedule_task.to_datetime >= schedule_task.from_datetime))) OR ((schedule_task.type = 'recurrently') AND (schedule_task.from_datetime <= '2018-04-26 18:29:00') AND ((schedule_task.to_datetime IS NULL) OR ((schedule_task.to_datetime >= '2018-04-26 18:29:00') AND (schedule_task.to_datetime > schedule_task.from_datetime))))) ORDER BY "schedule_task"."id" ASC
 */

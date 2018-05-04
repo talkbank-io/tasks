@@ -11,6 +11,16 @@ type Filter struct {
 	Value   string
 }
 
+type PendingTask struct {
+	tableName    struct{} `sql:"talkbank_bots.pending_task"`
+	Id           int `sql:"id"`
+	ActionId     int
+	UserId       int
+	Planned      time.Time
+	Delivery     *Delivery
+	ScheduleTask *ScheduleTask
+}
+
 // DB Model for table schedule_task
 type ScheduleTask struct {
 	tableName    struct{} `sql:"talkbank_bots.schedule_task"`
@@ -56,6 +66,7 @@ type Delivery struct {
 type ScheduleRepository struct {
 	task    []ScheduleTask
 	deliver []Delivery
+	pending []PendingTask
 }
 
 func NewScheduleRepository() *ScheduleRepository {
@@ -64,4 +75,8 @@ func NewScheduleRepository() *ScheduleRepository {
 
 func (scheduleModel *ScheduleRepository) GetTaskModel() []ScheduleTask {
 	return scheduleModel.task
+}
+
+func (scheduleModel *ScheduleRepository) GetPendingTaskModel() []PendingTask {
+	return scheduleModel.pending
 }
