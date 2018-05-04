@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"bufio"
+	"flag"
 	"github.com/killer-djon/cron"
 	"github.com/streadway/amqp"
 	"github.com/killer-djon/tasks/model"
@@ -22,7 +23,8 @@ const (
 )
 
 // Parse json config file
-var amqpString, _ = parseConfig("./config.json")
+var configFile string
+var amqpString map[string]interface{}
 var configDB = make(map[string]string)
 
 var database *pgdb.PgDB
@@ -36,21 +38,12 @@ var conn *consumers.Consumer
 var writer *bufio.Writer
 
 func init()  {
+	flag.StringVar(&configFile, "configFile", "./config.json", "Get config file with params")
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	config := amqpString["database"].(map[string]interface{})
-	for key, value := range config {
-		configDB[key] = value.(string)
-	}
-
-	database = pgdb.NewPgDB(configDB)
-	cronJob = &CronJob{
-		w: cron.New(),
-	}
-	cronJob.w.Start()
 }
 
 // Read config data.json
-func parseConfig(configFile string) (map[string]interface{}, error) {
+func parseConfig() (map[string]interface{}, error) {
 	config, err := ioutil.ReadFile(configFile)
 	var dat = make(map[string]interface{})
 
@@ -73,6 +66,20 @@ func parseConfig(configFile string) (map[string]interface{}, error) {
 
 
 func main() {
+	flag.Parse()
+	fmt.Print(configFile)
+	amqpString, _ = parseConfig()
+
+	config := amqpString["database"].(map[string]interface{})
+	for key, value := range config {
+		configDB[key] = value.(string)
+	}
+
+	database = pgdb.NewPgDB(configDB)
+	cronJob = &CronJob{
+		w: cron.New(),
+	}
+	cronJob.w.Start()
 
 	logFile, err := os.OpenFile("/var/log/tasks/tasks.log", os.O_RDWR | os.O_APPEND | os.O_CREATE, 0664)
 	if( err != nil ) {
