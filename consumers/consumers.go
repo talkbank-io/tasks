@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/streadway/amqp"
 )
@@ -37,6 +39,13 @@ uri,
 exchange,
 exchangeType,
 bindingKey string) *Consumer {
+	if( consumerTag == "" ) {
+		tag := sha256.New()
+		tag.Write([]byte(time.Now().UTC().Format("2006-01-02 15:04:05")))
+		sum := tag.Sum(nil)
+		consumerTag = "consumer_GOLANG_" + hex.EncodeToString(sum)
+	}
+
 	return &Consumer{
 		consumerTag:  consumerTag,
 		uri:          uri,

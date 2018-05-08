@@ -114,7 +114,6 @@ func StartConsumer() {
 		amqpConfig["host"].(string),
 		amqpConfig["port"].(string),
 		amqpConfig["vhost"].(string))
-
 	conn = consumers.NewConsumer(
 		"",
 		amqpUri,
