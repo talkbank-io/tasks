@@ -11,6 +11,10 @@ import (
 	"github.com/killer-djon/cron"
 )
 
+const (
+	TIME_SLEEP_PUBLISH = 10
+)
+
 type Onetime struct {
 	row   model.ScheduleTask
 	users []*model.Users
@@ -103,6 +107,8 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 
 			countPublishing++
 			fmt.Println("Message will be publish:", isPublish)
+
+			time.Sleep(TIME_SLEEP_PUBLISH * time.Second)
 		}
 
 		result["countPublishing"] = countPublishing

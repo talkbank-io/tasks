@@ -97,6 +97,8 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 
 			countPublishing++
 			fmt.Println("Message will be publish:", isPublish)
+
+			time.Sleep(TIME_SLEEP_PUBLISH * time.Second)
 		}
 
 		result["countPublishing"] = countPublishing
