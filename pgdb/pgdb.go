@@ -219,24 +219,35 @@ func (pgmodel *PgDB) GetUsersByFilter(userIds string) ([]*model.Users, error) {
 		users, ok := parseStringUserIds(userIds)
 		fmt.Println("Parsed users:", users)
 		var usersIn = []int{}
-		if( ok == true && len(users) > 0 ){
-			query = query.WhereGroup(func(q *orm.Query) (*orm.Query, error){
-				for _, usersId := range users {
-					if( len(usersId) > 1 ){
-						// Созтавной диапазон пользователей
-						sort.Ints(usersId)
-						q = q.WhereOr("users.id BETWEEN ? AND ?", usersId[0], usersId[1])
-					}else{
-						usersIn = append(usersIn, usersId[0])
-					}
+		var usersBetween = [][]int{}
+		if( ok == true ){
+			for _, usersId := range users {
+				if( len(usersId) > 1 ){
+					// Созтавной диапазон пользователей
+					sort.Ints(usersId)
+					usersBetween = [][]int{{usersId[0], usersId[1]}}
+				}else{
+					usersIn = append(usersIn, usersId[0])
 				}
+			}
+			if( len(usersBetween) > 0 ) {
+				query = query.WhereGroup(func(q *orm.Query) (*orm.Query, error){
+					for _, usersId := range usersBetween {
+						q = q.WhereOr("users.id BETWEEN ? AND ?", usersId[0], usersId[1])
+					}
 
-				return q, nil
-			})
+					return q, nil
+				})
+			}
 
 
 			if( len(usersIn) > 0 ){
-				query = query.WhereOr("users.id IN (?)", pg.In(usersIn))
+				if( len(usersBetween) > 0 ) {
+					query = query.WhereOr("users.id IN (?)", pg.In(usersIn))
+				}else {
+					query = query.Where("users.id IN (?)", pg.In(usersIn))
+				}
+
 			}
 		}
 	}
@@ -264,24 +275,35 @@ func (pgmodel *PgDB) GetActiveUsers(userIds string, filter []model.Filter) ([]*m
 		users, ok := parseStringUserIds(userIds)
 		fmt.Println("Parsed users:", users)
 		var usersIn = []int{}
-		if( ok == true && len(users) > 0 ){
-			query = query.WhereGroup(func(q *orm.Query) (*orm.Query, error){
-				for _, usersId := range users {
-					if( len(usersId) > 1 ){
-						// Созтавной диапазон пользователей
-						sort.Ints(usersId)
-						q = q.WhereOr("users.id BETWEEN ? AND ?", usersId[0], usersId[1])
-					}else{
-						usersIn = append(usersIn, usersId[0])
-					}
+		var usersBetween = [][]int{}
+		if( ok == true ){
+			for _, usersId := range users {
+				if( len(usersId) > 1 ){
+					// Созтавной диапазон пользователей
+					sort.Ints(usersId)
+					usersBetween = [][]int{{usersId[0], usersId[1]}}
+				}else{
+					usersIn = append(usersIn, usersId[0])
 				}
+			}
+			if( len(usersBetween) > 0 ) {
+				query = query.WhereGroup(func(q *orm.Query) (*orm.Query, error){
+					for _, usersId := range usersBetween {
+						q = q.WhereOr("users.id BETWEEN ? AND ?", usersId[0], usersId[1])
+					}
 
-				return q, nil
-			})
+					return q, nil
+				})
+			}
 
 
 			if( len(usersIn) > 0 ){
-				query = query.WhereOr("users.id IN (?)", pg.In(usersIn))
+				if( len(usersBetween) > 0 ) {
+					query = query.WhereOr("users.id IN (?)", pg.In(usersIn))
+				}else {
+					query = query.Where("users.id IN (?)", pg.In(usersIn))
+				}
+
 			}
 		}
 	}
