@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	TIME_SLEEP_PUBLISH = 10
+	TIME_SLEEP_PUBLISH = 3
 )
 
 type Onetime struct {
