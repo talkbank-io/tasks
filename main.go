@@ -67,7 +67,8 @@ func parseConfig() (map[string]interface{}, error) {
 
 func main() {
 	flag.Parse()
-	fmt.Print(configFile)
+	fmt.Println(configFile)
+
 	amqpString, _ = parseConfig()
 
 	config := amqpString["database"].(map[string]interface{})
@@ -103,14 +104,6 @@ func main() {
 	go StartSchedulersJob()
 	StartConsumer()
 
-	/*resultSet, err := database.SelectCurrentScheduler()
-
-	if( err != nil ){
-		fmt.Println("Error to get data from Db", err)
-	}
-
-	fmt.Println("Len of the records:", len(resultSet))
-	*/
 }
 
 func StartConsumer() {
@@ -250,6 +243,7 @@ func StartSchedulersJob() {
 func runPendingTask(pendingTasks []model.PendingTask) {
 	fmt.Println("Length of pending task records:", len(pendingTasks))
 	fmt.Fprintf(writer, "Length of pending task records:", len(pendingTasks))
+
 	if( len(pendingTasks) > 0 ) {
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
 		publisherQueue := publisher.NewPublisher(conn.GetConnection())

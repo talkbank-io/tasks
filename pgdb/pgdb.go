@@ -109,13 +109,6 @@ func (pgmodel *PgDB) SelectPendingTasks() ([]model.PendingTask, error) {
 		ColumnExpr("schedule_task.id AS schedule_task__id").
 		ColumnExpr("delivery.id AS delivery__id").
 		ColumnExpr("delivery.text AS delivery__text").
-		/*ColumnExpr("delivery.title AS delivery__title").
-		ColumnExpr("delivery.text AS delivery__text").
-		ColumnExpr("delivery.user_ids AS delivery__user_ids").
-		ColumnExpr("delivery.id AS delivery__id").
-		ColumnExpr("delivery.filter AS delivery__filter").
-		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = pending_task.action_id").
-		*/
 		Join("INNER JOIN talkbank_bots.schedule_task AS schedule_task ON schedule_task.action_id = pending_task.action_id").
 		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
 		Where("pending_task.planned <= ?", now).
@@ -212,6 +205,51 @@ func (pgmodel *PgDB) GetSchedulerById(modelId int) (*model.ScheduleTask, error) 
 }
 
 // Get users by params
+func (pgmodel *PgDB) GetUsersByFilter(userIds string) ([]*model.Users, error) {
+	userRepository := model.NewUserRepository()
+	userModel := userRepository.GetUserModel()
+
+	query := pgmodel.db.Model(&userModel).
+		ColumnExpr("distinct(users.id)").
+		Column("users.*").
+		Join("INNER JOIN talkbank_bots.messenger_users AS messenger_users ON messenger_users.user_id = users.id").
+		Where("messenger_users.is_active = ?", true)
+
+	if( userIds != "" ){
+		users, ok := parseStringUserIds(userIds)
+		fmt.Println("Parsed users:", users)
+		var usersIn = []int{}
+		if( ok == true && len(users) > 0 ){
+			query = query.WhereGroup(func(q *orm.Query) (*orm.Query, error){
+				for _, usersId := range users {
+					if( len(usersId) > 1 ){
+						// Созтавной диапазон пользователей
+						sort.Ints(usersId)
+						q = q.WhereOr("users.id BETWEEN ? AND ?", usersId[0], usersId[1])
+					}else{
+						usersIn = append(usersIn, usersId[0])
+					}
+				}
+
+				return q, nil
+			})
+
+
+			if( len(usersIn) > 0 ){
+				query = query.WhereOr("users.id IN (?)", pg.In(usersIn))
+			}
+		}
+	}
+
+	err := query.Order("users.id ASC").Select()
+
+	if err != nil {
+		fmt.Println("Error to get data from users", err)
+		return nil, err
+	}
+	return userModel, nil
+}
+
 func (pgmodel *PgDB) GetActiveUsers(userIds string, filter []model.Filter) ([]*model.Users, error) {
 	userRepository := model.NewUserRepository()
 	userModel := userRepository.GetUserModel()
@@ -224,19 +262,26 @@ func (pgmodel *PgDB) GetActiveUsers(userIds string, filter []model.Filter) ([]*m
 
 	if( userIds != "" ){
 		users, ok := parseStringUserIds(userIds)
+		fmt.Println("Parsed users:", users)
 		var usersIn = []int{}
-		if( ok == true ){
-			for _, usersId := range users {
-				if( len(usersId) > 1 ){
-					sort.Ints(usersId)
-					query = query.Where("users.id BETWEEN ? AND ?", usersId[0], usersId[1])
-				}else{
-					usersIn = append(usersIn, usersId[0])
+		if( ok == true && len(users) > 0 ){
+			query = query.WhereGroup(func(q *orm.Query) (*orm.Query, error){
+				for _, usersId := range users {
+					if( len(usersId) > 1 ){
+						// Созтавной диапазон пользователей
+						sort.Ints(usersId)
+						q = q.WhereOr("users.id BETWEEN ? AND ?", usersId[0], usersId[1])
+					}else{
+						usersIn = append(usersIn, usersId[0])
+					}
 				}
-			}
+
+				return q, nil
+			})
+
 
 			if( len(usersIn) > 0 ){
-				query = query.Where("users.id IN (?)", pg.In(usersIn))
+				query = query.WhereOr("users.id IN (?)", pg.In(usersIn))
 			}
 		}
 	}
