@@ -33,6 +33,8 @@ func (pub *Publisher) Publish(queue_name string, message []byte) (bool, error) {
 		return false, err
 	}
 
+	defer c.Close()
+
 	// Declare queue if not exists
 	Queue, err := c.QueueDeclare(
 		queue_name,

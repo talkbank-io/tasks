@@ -43,7 +43,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 
 	var result = make(map[string]int, 2)
 
-	if ( nextRun.Equal(now) ) {
+	if ( nextRun.Equal(now) || nextRun.Add(time.Minute).Equal(now) ) {
 		// Если время следующего запуска совпадает с текущим временем
 		// мы запускаем задачу, стопорим cronjob до момент завершения задачи
 		// потом заного запускаем до следующего ожидания
@@ -98,7 +98,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 			countPublishing++
 			fmt.Println("Message will be publish:", isPublish)
 
-			time.Sleep(TIME_SLEEP_PUBLISH * time.Second)
+			//time.Sleep(TIME_SLEEP_PUBLISH * time.Second)
 		}
 
 		result["countPublishing"] = countPublishing

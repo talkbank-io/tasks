@@ -16,7 +16,7 @@ const (
 )
 
 type Onetime struct {
-	row   model.ScheduleTask
+	row   *model.ScheduleTask
 	users []*model.Users
 	pub   *publisher.Publisher
 	db	*pgdb.PgDB
@@ -38,7 +38,7 @@ type FinalizeMessage struct {
 	ScheduleId     int
 }
 
-func NewOnetime(scheduleModel model.ScheduleTask, pub *publisher.Publisher, database *pgdb.PgDB) *Onetime {
+func NewOnetime(scheduleModel *model.ScheduleTask, pub *publisher.Publisher, database *pgdb.PgDB) *Onetime {
 	return &Onetime{
 		row: scheduleModel,
 		pub: pub,
@@ -56,7 +56,8 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 
 	var result = make(map[string]int, 2)
 
-	if ( fromDate.Equal(now) ) {
+	fmt.Println("Time is equal like ", (fromDate.Equal(now) || fromDate.Add(time.Minute).Equal(now)))
+	if ( fromDate.Equal(now) || fromDate.Add(time.Minute).Equal(now) ) {
 
 		hash, err := schedule.db.SaveHash(schedule.row.Id, schedule.row.Delivery.Id)
 		if( err != nil ){
@@ -108,7 +109,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 			countPublishing++
 			fmt.Println("Message will be publish:", isPublish)
 
-			time.Sleep(TIME_SLEEP_PUBLISH * time.Second)
+			//time.Sleep(TIME_SLEEP_PUBLISH * time.Second)
 		}
 
 		result["countPublishing"] = countPublishing
