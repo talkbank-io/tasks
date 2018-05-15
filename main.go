@@ -138,7 +138,7 @@ func StartSchedulersJob() {
 		scheduleTaskItem := scheduleItem
 
 		fmt.Printf("If job is running: %d\n", cronJob.w.Status(scheduleTaskItem.Id))
-		//if ( cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
+		if ( cronJob.w.Status(scheduleTaskItem.Id) != 1 || cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
 			if ( scheduleTaskItem.Type == "onetime" ) {
 				cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
 					go runOnetime(scheduleTaskItem)
@@ -161,7 +161,7 @@ func StartSchedulersJob() {
 					go runRecurrently(scheduleTaskItem, cronTemplate)
 				})
 			}
-		//}
+		}
 	}
 
 }
@@ -274,40 +274,3 @@ func getAmqpConnectionChannel() (*amqp.Connection, error) {
 
 	return connection, nil
 }
-
-/*
-
-func StartConsumer() {
-	amqpConfig := amqpString["amqp"].(map[string]interface{})
-	amqpUri := fmt.Sprintf("amqp://%s:%s@%s:%s%s",
-		amqpConfig["user"].(string),
-		amqpConfig["password"].(string),
-		amqpConfig["host"].(string),
-		amqpConfig["port"].(string),
-		amqpConfig["vhost"].(string))
-	conn = consumers.NewConsumer(
-		"",
-		amqpUri,
-		amqpConfig["queueName"].(string),
-		amqpConfig["exchangeType"].(string),
-		amqpConfig["queueName"].(string),
-	)
-
-	if err := conn.Connect(); err != nil {
-		log.Printf("Error: %v", err)
-	}
-
-	deliveries, err := conn.AnnounceQueue(amqpConfig["queueName"].(string), "")
-	if err != nil {
-		log.Printf("Error when calling AnnounceQueue(): %v", err.Error())
-	}
-
-	var threads int
-	threadsConfig := amqpString["threads"].(float64)
-	threads = int(threadsConfig)
-
-	fmt.Printf("Thread number %d\n", threads)
-
-	conn.Handle(deliveries, handler, threads, amqpConfig["queueName"].(string), "")
-}
-*/
