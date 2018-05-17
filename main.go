@@ -158,7 +158,7 @@ func StartSchedulersJob() {
 				)
 
 				cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
-					go runRecurrently(scheduleTaskItem, cronTemplate)
+					go runRecurrently(scheduleTaskItem)
 				})
 			}
 		}
@@ -184,15 +184,16 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 
 }
 
-func runRecurrently(scheduleTask model.ScheduleTask, template string) {
+func runRecurrently(scheduleTask model.ScheduleTask) {
 	publisherConfig := amqpString["publisher"].(map[string]interface{})
 	connection, err := getAmqpConnectionChannel()
 	if( err != nil  ) {
 		fmt.Errorf("Channel connection is closed: %v", err)
 	}
+	currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
+	fmt.Println(currentSchedulerTask)
 	publisherQueue := publisher.NewPublisher(connection)
-
-	recurrentlyScheduler := schedule.NewRecurrently(scheduleTask, publisherQueue, database)
+	recurrentlyScheduler := schedule.NewRecurrently(currentSchedulerTask, publisherQueue, database)
 	result := recurrentlyScheduler.Run(publisherConfig, cronJob.w)
 
 	if ( len(result) > 0 ) {
