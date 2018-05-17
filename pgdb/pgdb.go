@@ -122,6 +122,9 @@ func (pgmodel *PgDB) SelectPendingTasks() ([]model.PendingTask, error) {
 	return pendingModel, nil
 }
 
+
+
+
 /*
 SELECT schedule_task.*, delivery.title AS delivery__title, delivery.text AS delivery__text, delivery.user_ids AS delivery__user_ids, delivery.id AS delivery__id, delivery.filter AS delivery__filter FROM talkbank_bots.schedule_task AS "schedule_task" INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id WHERE (schedule_task.is_active = TRUE) AND (((schedule_task.type = 'onetime') AND (schedule_task.from_datetime >= '2018-04-26 18:29:00') AND ((schedule_task.to_datetime IS NULL) OR (schedule_task.to_datetime >= schedule_task.from_datetime))) OR ((schedule_task.type = 'recurrently') AND (schedule_task.from_datetime <= '2018-04-26 18:29:00') AND ((schedule_task.to_datetime IS NULL) OR ((schedule_task.to_datetime >= '2018-04-26 18:29:00') AND (schedule_task.to_datetime > schedule_task.from_datetime))))) ORDER BY "schedule_task"."id" ASC
 */
@@ -194,6 +197,37 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 
 }
 
+func (pgmodel *PgDB) GetUserDeliveryCountByHash(result map[string]int, scheduleId int) (int, error) {
+
+	scheduleModel, errDb := pgmodel.GetSchedulerById(scheduleId)
+	if( errDb != nil ) {
+		fmt.Printf("Erro to get schedule by ID: %d, %v\n", scheduleId, errDb)
+		return 0, errDb
+	}
+
+	userDeliveryModel := &model.UserDelivery{}
+	count, err := pgmodel.db.Model(userDeliveryModel).
+		ColumnExpr("user_delivery.*").
+		ColumnExpr("delivery.id AS delivery__id").
+		ColumnExpr("delivery.delivery_hash AS delivery__hash").
+		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = user_delivery.delivery_id").
+		Where("user_delivery.delivery_hash = ?", scheduleModel.Delivery.ActionHash).
+		Count()
+
+	if err != nil {
+		fmt.Println("Error to get data from user_delivery", err)
+		return 0, err
+	}
+
+	fmt.Println("Finded count by hash", result["lenUsers"], count, scheduleModel.Delivery.ActionHash)
+
+	if( result["lenUsers"] == count ) {
+		return count, nil
+	}
+
+	return 0, nil
+}
+
 func (pgmodel *PgDB) GetSchedulerById(modelId int) (*model.ScheduleTask, error) {
 	scheduleModel := &model.ScheduleTask{Id: modelId}
 	err := pgmodel.db.Model(scheduleModel).
@@ -203,6 +237,7 @@ func (pgmodel *PgDB) GetSchedulerById(modelId int) (*model.ScheduleTask, error) 
 		ColumnExpr("delivery.user_ids AS delivery__user_ids").
 		ColumnExpr("delivery.id AS delivery__id").
 		ColumnExpr("delivery.filter AS delivery__filter").
+		ColumnExpr("delivery.action_hash AS delivery__action_hash").
 		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
 		Where("schedule_task.id = ?", modelId).
 		Select()
@@ -450,6 +485,8 @@ func (pgmodel *PgDB) GetFilterQuery(query *orm.Query, filters []model.Filter) (*
 
 	return query, i
 }
+
+
 
 /**
  * Create string with params field

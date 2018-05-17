@@ -63,6 +63,18 @@ type Delivery struct {
 	ActionHash          string
 }
 
+type UserDelivery struct {
+	tableName    struct{} `sql:"talkbank_bots.user_delivery"`
+	Id           int `sql:"id"`
+	UserId       int
+	DeliveryId   int
+	Status       string
+	CreatedAt    time.Time `sql:"default:now()"`
+	UpdatedAt    time.Time
+	DeliveryHash string
+	Delivery     *Delivery
+}
+
 type ScheduleRepository struct {
 	task    []ScheduleTask
 	deliver []Delivery

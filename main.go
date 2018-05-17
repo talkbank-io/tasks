@@ -1,7 +1,6 @@
 package main
 
 import (
-
 	"io/ioutil"
 	"encoding/json"
 	"runtime"
@@ -63,8 +62,6 @@ func parseConfig() (map[string]interface{}, error) {
 
 	return dat, nil
 }
-
-
 
 func main() {
 	flag.Parse()
@@ -138,7 +135,7 @@ func StartSchedulersJob() {
 	for _, scheduleItem := range resultSet {
 		scheduleTaskItem := scheduleItem
 
-		fmt.Printf("If job is running: %d\n", cronJob.w.Status(scheduleTaskItem.Id))
+		fmt.Printf("If job is running, jobID: %d, and status: %d\n", scheduleTaskItem.Id, cronJob.w.Status(scheduleTaskItem.Id))
 		if ( cronJob.w.Status(scheduleTaskItem.Id) != 1 || cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
 			if ( scheduleTaskItem.Type == "onetime" ) {
 				cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
@@ -174,7 +171,7 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 	if ( len(pendingTasks) > 0 ) {
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
 		connection, err := getAmqpConnectionChannel()
-		if( err != nil  ) {
+		if ( err != nil  ) {
 			fmt.Errorf("Channel connection is closed: %v", err)
 		}
 		publisherQueue := publisher.NewPublisher(connection)
@@ -185,41 +182,26 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 }
 
 func runRecurrently(scheduleTask model.ScheduleTask) {
-	publisherConfig := amqpString["publisher"].(map[string]interface{})
-	connection, err := getAmqpConnectionChannel()
-	if( err != nil  ) {
-		fmt.Errorf("Channel connection is closed: %v", err)
-	}
-	currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
-	fmt.Println(currentSchedulerTask)
-	publisherQueue := publisher.NewPublisher(connection)
-	recurrentlyScheduler := schedule.NewRecurrently(currentSchedulerTask, publisherQueue, database)
-	result := recurrentlyScheduler.Run(publisherConfig, cronJob.w)
+	if( scheduleTask.IsActive == true ) {
+		publisherConfig := amqpString["publisher"].(map[string]interface{})
+		connection, err := getAmqpConnectionChannel()
+		if ( err != nil  ) {
+			fmt.Errorf("Channel connection is closed: %v", err)
+		}
+		currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
+		fmt.Println(currentSchedulerTask)
+		publisherQueue := publisher.NewPublisher(connection)
+		recurrentlyScheduler := schedule.NewRecurrently(currentSchedulerTask, publisherQueue, database)
+		result := recurrentlyScheduler.Run(publisherConfig, cronJob.w)
 
-	if ( len(result) > 0 ) {
-		cronJob.w.RemoveFunc(scheduleTask.Id)
-		go func(){
-			cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id*1000), func(){
-				fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
-				//userDeliveryCount :=
-			})
-		}()
+		if ( len(result) > 0 ) {
 
-		publish := recurrentlyScheduler.SendTransmitStatistic(publisherConfig, result)
-		if ( publish == true ) {
-			fmt.Printf(
-				"Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
-				scheduleTask.Id,
-				result["lenUsers"],
-				result["countPublishing"],
-				result["countUnPublished"])
-			fmt.Fprintf(writer, "Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
-				scheduleTask.Id,
-				result["lenUsers"],
-				result["countPublishing"],
-				result["countUnPublished"])
-			writer.Flush()
-
+			go func() {
+				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
+					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
+					go checkDeliveredUsers(publisherConfig, result, scheduleTask.Id, "recurrently")
+				})
+			}()
 		}
 	}
 }
@@ -227,14 +209,14 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 func runOnetime(scheduleTask model.ScheduleTask) {
 	publisherConfig := amqpString["publisher"].(map[string]interface{})
 	connection, err := getAmqpConnectionChannel()
-	if( err != nil  ) {
+	if ( err != nil  ) {
 		fmt.Errorf("Channel connection is closed: %v", err)
 	}
 
 	currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
 	fmt.Println(currentSchedulerTask)
 
-	if( err != nil  ) {
+	if ( err != nil  ) {
 		fmt.Errorf("Cant get schedule by ID: %v", err)
 	}
 
@@ -244,28 +226,69 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 
 	if ( len(result) > 0 ) {
 		cronJob.w.RemoveFunc(scheduleTask.Id)
-		go func(){
-			cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id*1000), func(){
+		go func() {
+			cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
 				fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
+				go checkDeliveredUsers(publisherConfig, result, scheduleTask.Id, "onetime")
 			})
 		}()
+	}
+}
 
-		publish := onetimeSchedule.SendTransmitStatistic(publisherConfig, result)
-		if ( publish == true ) {
+func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[string]int, scheduleId int, actionTipe string) {
+
+	countUsersDelivery, _ := database.GetUserDeliveryCountByHash(result, scheduleId)
+
+	fmt.Printf("Count of users_delivery now: %d, coverage: %d", countUsersDelivery, result["lenUsers"])
+	if ( countUsersDelivery == result["lenUsers"] ) {
+		finalize := &schedule.FinalizeMessage{
+			CoverageCount:  result["lenUsers"],
+			PublishCount: result["countPublishing"],
+			UnpublishCount: result["lenUsers"] - result["countPublishing"],
+			ScheduleId: scheduleId,
+			ActionType: actionTipe,
+		}
+
+		finalize_message, err := json.Marshal(finalize)
+		if err != nil {
+			fmt.Println("error:", err)
+		}
+		connection, _ := getAmqpConnectionChannel()
+		publisherQueue := publisher.NewPublisher(connection)
+
+		isPublish, err := publisherQueue.Publish(publisherConfig["queue_statistic"].(string), finalize_message)
+
+		if err != nil {
+			fmt.Println("error on publishing:", err)
+		}
+
+		if ( isPublish == true ) {
 			fmt.Printf(
 				"Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
-				scheduleTask.Id,
+				scheduleId,
 				result["lenUsers"],
 				result["countPublishing"],
 				result["countUnPublished"])
 
 			fmt.Fprintf(writer, "Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
-				scheduleTask.Id,
+				scheduleId,
 				result["lenUsers"],
 				result["countPublishing"],
 				result["countUnPublished"])
 
 			writer.Flush()
+			cronJob.w.RemoveFunc(scheduleId * 1000)
+
+			currentScheduler, _ := database.GetSchedulerById(scheduleId)
+			if ( currentScheduler.Type == "onetime" ) {
+				cronJob.w.RemoveFunc(scheduleId)
+			} else {
+				if ( currentScheduler.IsActive == false ) {
+					cronJob.w.RemoveFunc(scheduleId)
+				} else {
+					cronJob.w.ResumeFunc(scheduleId)
+				}
+			}
 		}
 	}
 }

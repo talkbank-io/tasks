@@ -1,7 +1,6 @@
 package schedule
 
 import (
-
 	"fmt"
 	"time"
 	"encoding/json"
@@ -19,7 +18,7 @@ type Onetime struct {
 	row   *model.ScheduleTask
 	users []*model.Users
 	pub   *publisher.Publisher
-	db	*pgdb.PgDB
+	db    *pgdb.PgDB
 }
 
 type QueueMessage struct {
@@ -28,7 +27,7 @@ type QueueMessage struct {
 	MassActionId int
 	Text         string
 	Coverage     int
-	Hash	string
+	Hash         string
 }
 
 type FinalizeMessage struct {
@@ -36,6 +35,7 @@ type FinalizeMessage struct {
 	PublishCount   int
 	UnpublishCount int
 	ScheduleId     int
+	ActionType     string
 }
 
 func NewOnetime(scheduleModel *model.ScheduleTask, pub *publisher.Publisher, database *pgdb.PgDB) *Onetime {
@@ -60,7 +60,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 	if ( fromDate.Equal(now) || fromDate.Add(time.Minute).Equal(now) ) {
 
 		hash, err := schedule.db.SaveHash(schedule.row.Id, schedule.row.Delivery.Id)
-		if( err != nil ){
+		if ( err != nil ) {
 			fmt.Println(err)
 			cronJob.ResumeFunc(schedule.row.Id)
 			return result
@@ -122,7 +122,6 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 
 	return result
 }
-
 
 func (schedule *Onetime) SendTransmitStatistic(publisherConfig map[string]interface{}, result map[string]int) bool {
 	finalize := &FinalizeMessage{
