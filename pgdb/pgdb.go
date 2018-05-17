@@ -75,6 +75,19 @@ func (pgmodel *PgDB) SetHashAction(Id int, hash string) (string, error) {
 	return hashString, nil
 }
 
+func (pgmodel *PgDB) SetIsRunning(Id int, isRunning bool) {
+
+	_, err := pgmodel.db.Model(&model.ScheduleTask{}).
+		Set("is_running = ?", isRunning).
+		Where("id = ?", Id).
+		Returning("is_running").
+		Update()
+
+	if( err != nil ) {
+		fmt.Println("ERror on update item", Id, err)
+	}
+}
+
 func (pgmodel *PgDB) SaveHash(scheduleId, deliveryId int) (string, error) {
 
 	hash := sha256.New()

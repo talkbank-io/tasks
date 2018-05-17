@@ -56,6 +56,8 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 			return result
 		}
 
+		schedule.db.SetIsRunning(schedule.row.Id, true)
+
 		start := time.Now()
 		fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
 		cronJob.PauseFunc(schedule.row.Id)

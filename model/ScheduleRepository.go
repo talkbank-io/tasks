@@ -39,6 +39,7 @@ type ScheduleTask struct {
 	NextRun      time.Time
 	StartTz      string
 	Delivery     *Delivery
+	IsRunning    bool
 }
 
 // DB Model for table delivery

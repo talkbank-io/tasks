@@ -280,6 +280,8 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 			cronJob.w.RemoveFunc(scheduleId * 1000)
 
 			currentScheduler, _ := database.GetSchedulerById(scheduleId)
+			database.SetIsRunning(scheduleId, false)
+
 			if ( currentScheduler.Type == "onetime" ) {
 				cronJob.w.RemoveFunc(scheduleId)
 			} else {
