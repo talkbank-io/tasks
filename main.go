@@ -20,6 +20,7 @@ import (
 
 const (
 	CRON_ONETIME_FORMAT = "0 * * * * *" // every minutes
+	CRON_EVERY_QUARTER_SECONDS = "*/15 * * * *" // every 15 seconds
 )
 
 // Parse json config file
@@ -177,7 +178,6 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 			fmt.Errorf("Channel connection is closed: %v", err)
 		}
 		publisherQueue := publisher.NewPublisher(connection)
-
 		pendingTaskSchedule := schedule.NewPending(pendingTasks, publisherQueue, database)
 		pendingTaskSchedule.Run(publisherConfig)
 	}
@@ -198,6 +198,13 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 
 	if ( len(result) > 0 ) {
 		cronJob.w.RemoveFunc(scheduleTask.Id)
+		go func(){
+			cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id*1000), func(){
+				fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
+				//userDeliveryCount :=
+			})
+		}()
+
 		publish := recurrentlyScheduler.SendTransmitStatistic(publisherConfig, result)
 		if ( publish == true ) {
 			fmt.Printf(
@@ -237,6 +244,12 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 
 	if ( len(result) > 0 ) {
 		cronJob.w.RemoveFunc(scheduleTask.Id)
+		go func(){
+			cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id*1000), func(){
+				fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
+			})
+		}()
+
 		publish := onetimeSchedule.SendTransmitStatistic(publisherConfig, result)
 		if ( publish == true ) {
 			fmt.Printf(

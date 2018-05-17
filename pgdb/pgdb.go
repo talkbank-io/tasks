@@ -158,15 +158,26 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 				WhereOrGroup(func(subQ2 *orm.Query) (*orm.Query, error){
 					return subQ2.
 						Where("schedule_task.type = ?", "recurrently").
-						Where("schedule_task.from_datetime <= ?", now).
-						WhereGroup(func(subQ *orm.Query) (*orm.Query, error) {
-							return subQ.
+						WhereGroup(func(subGroup *orm.Query) (*orm.Query, error){
+							return  subGroup.Where("schedule_task.from_datetime <= ?", now).
+								WhereGroup(func(subQ *orm.Query) (*orm.Query, error) {
+								return subQ.
 								WhereOr("schedule_task.to_datetime IS NULL").
-								//WhereOr("schedule_task.to_datetime >= ?", now), nil
-								WhereOrGroup(func(subQ1 *orm.Query) (*orm.Query, error){
+									WhereOrGroup(func(subQ1 *orm.Query) (*orm.Query, error){
 									return subQ1.
 										Where("schedule_task.to_datetime >= ?", now).
 										Where("schedule_task.to_datetime > schedule_task.from_datetime"), nil
+								}), nil
+							}), nil
+						}).
+						WhereOrGroup(func(subGroup2 *orm.Query) (*orm.Query, error) {
+							return subGroup2.
+								Where("schedule_task.from_datetime >= ?", now).
+								Where("schedule_task.from_datetime <= schedule_task.next_run").
+								WhereGroup(func(toGroup *orm.Query) (*orm.Query, error) {
+									return toGroup.
+										WhereOr("schedule_task.to_datetime IS NULL").
+										WhereOr("schedule_task.to_datetime >= schedule_task.next_run"), nil
 								}), nil
 						}), nil
 				}), nil

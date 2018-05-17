@@ -33,6 +33,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 	entry := cronJob.EntryById(schedule.row.Id)
 
 	nextRun, _ := time.Parse("2006-01-02 15:04:00", schedule.row.NextRun.Format("2006-01-02 15:04:00"))
+	fromDateTime, _ := time.Parse("2006-01-02 15:04:00", schedule.row.FromDatetime.Format("2006-01-02 15:04:00"))
 	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 
 	fmt.Printf("Recurrently entry to be runned: Current time=%v, Next time=%v, Now time=%v, Next runtime=%v\n",
@@ -43,7 +44,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 
 	var result = make(map[string]int, 2)
 
-	if ( nextRun.Equal(now) || nextRun.Add(time.Minute).Equal(now) ) {
+	if ( (fromDateTime.Before(now) || fromDateTime.Equal(now)) && (nextRun.Equal(now) || nextRun.Add(time.Minute).Equal(now)) ) {
 		// Если время следующего запуска совпадает с текущим временем
 		// мы запускаем задачу, стопорим cronjob до момент завершения задачи
 		// потом заного запускаем до следующего ожидания
