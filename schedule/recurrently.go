@@ -12,13 +12,13 @@ import (
 
 
 type Recurrently struct {
-	row model.ScheduleTask
+	row *model.ScheduleTask
 	pub *publisher.Publisher
 	db  *pgdb.PgDB
 }
 
 // Constructor
-func NewRecurrently(scheduleModel model.ScheduleTask, pub *publisher.Publisher, database *pgdb.PgDB) *Recurrently {
+func NewRecurrently(scheduleModel *model.ScheduleTask, pub *publisher.Publisher, database *pgdb.PgDB) *Recurrently {
 
 	return &Recurrently{
 		row: scheduleModel,
