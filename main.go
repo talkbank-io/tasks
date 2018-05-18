@@ -156,12 +156,14 @@ func StartSchedulersJob() {
 
 				if( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
 					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
-
+					entryNextRun := entry.Next.UTC()
+					scheduleNextRun := scheduleTaskItem.NextRun.UTC()
 					fmt.Printf(
-						"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v\n",
+						"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v, is Equal nextrun=%v\n",
 						time.Now().UTC(),
 						scheduleTaskItem.NextRun.UTC(),
-						entry.Next.UTC())
+						entry.Next.UTC(),
+						entryNextRun.Equal(scheduleNextRun))
 				}
 
 
