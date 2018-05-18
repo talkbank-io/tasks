@@ -36,11 +36,14 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 	//fromDateTime, _ := time.Parse("2006-01-02 15:04:00", schedule.row.FromDatetime.Format("2006-01-02 15:04:00"))
 	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 
-	fmt.Printf("Recurrently entry to be runned: Current time=%v, Next time=%v, Now time=%v, Next runtime=%v\n",
-		entry.Prev.UTC(),
-		entry.Next.UTC(),
-		now,
-		nextRun)
+	if( entry != nil ) {
+		fmt.Printf("Recurrently entry to be runned: Current time=%v, Next time=%v, Now time=%v, Next runtime=%v\n",
+			entry.Prev.UTC(),
+			entry.Next.UTC(),
+			now,
+			nextRun)
+	}
+
 
 	var result = make(map[string]int, 2)
 

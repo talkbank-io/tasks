@@ -21,6 +21,7 @@ import (
 const (
 	CRON_ONETIME_FORMAT = "0 * * * * *" // every minutes
 	CRON_EVERY_QUARTER_SECONDS = "*/15 * * * *" // every 15 seconds
+	LOG_FILE = "/var/log/tasks/tasks.log"
 )
 
 // Parse json config file
@@ -86,7 +87,11 @@ func main() {
 		fmt.Println("Runned cronjos by Id:", cj)
 	}
 
-	logFile, err := os.OpenFile("/var/log/tasks/tasks.log", os.O_RDWR | os.O_APPEND | os.O_CREATE, 0664)
+	if _, err := os.Stat(LOG_FILE); err == nil {
+		_ = os.Remove(LOG_FILE)
+	}
+
+	logFile, err := os.OpenFile(LOG_FILE, os.O_RDWR | os.O_APPEND | os.O_CREATE, 0664)
 	if ( err != nil ) {
 		fmt.Printf("ERror on create/open log file=%v\n", err)
 		os.Exit(1)
@@ -133,12 +138,30 @@ func StartSchedulersJob() {
 	for _, scheduleItem := range resultSet {
 		scheduleTaskItem := scheduleItem
 
-		fmt.Printf("Running jobID: %d, and status: %d\n", scheduleTaskItem.Id, cronJob.w.Status(scheduleTaskItem.Id))
-		if ( cronJob.w.Status(scheduleTaskItem.Id) != 1 || cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
+		// Status inquires the status of a job, 0: running, 1: paused, -1: not started.
+		fmt.Printf("Running jobID: %d, type=%s, and status: %d\n", scheduleTaskItem.Id, scheduleTaskItem.Type, cronJob.w.Status(scheduleTaskItem.Id))
+
+		// если задача не запущена
+		// или не в паузе тогда создаем задачу и запускаем ее
+		if ( cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1 ) {
 			if ( scheduleTaskItem.Type == "onetime" ) {
-				cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
+				currentTime, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
+				fromDate, _ := time.Parse("2006-01-02 15:04:00", scheduleTaskItem.FromDatetime.Format("2006-01-02 15:04:00"))
+
+				if ( fromDate.Equal(currentTime) &&
+					cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
+					fmt.Printf("Current time is equal to fromdate and run job=%d, current=%v, fromDate=%v\n",
+						scheduleTaskItem.Id,
+						currentTime,
+						fromDate)
 					go runOnetime(scheduleTaskItem)
-				})
+				} else {
+					fmt.Printf("Run cronjob for onetime task=%d, at=%v\n", scheduleTaskItem.Id, time.Now().UTC())
+					cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
+						fmt.Printf("Job will be running: %d\n", scheduleTaskItem.Id)
+						go runOnetime(scheduleTaskItem)
+					})
+				}
 
 			} else {
 
@@ -154,7 +177,7 @@ func StartSchedulersJob() {
 				)
 				fmt.Println("Cronjob recurrently template", cronTemplate, scheduleTaskItem.Id)
 
-				if( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
+				if ( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
 					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
 					entryNextRun := entry.Next.UTC()
 					scheduleNextRun := scheduleTaskItem.NextRun.UTC()
@@ -166,10 +189,26 @@ func StartSchedulersJob() {
 						entryNextRun.Equal(scheduleNextRun))
 				}
 
+				currentTime, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
+				//jobNextRun :=
+				nextRunDate, _ := time.Parse("2006-01-02 15:04:00", scheduleTaskItem.NextRun.Format("2006-01-02 15:04:00"))
 
-				cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
+				// если при запуске задачника мы находим recurrenllty задачу
+				// и понимаем что ее надо зупускать, потому что она не была запущена
+				// то мы ее запускаем
+				// иначе смотрим если дата следующего запуска больше текущей даты
+				// тогда запускаем задачник по расписанию в шаблоне
+				if ( nextRunDate.Equal(currentTime) && cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
+					fmt.Printf("Current time is equal to fromdate and run job=%d, current=%v, fromDate=%v\n",
+						scheduleTaskItem.Id,
+						currentTime,
+						nextRunDate)
 					go runRecurrently(scheduleTaskItem)
-				})
+				} else {
+					cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
+						go runRecurrently(scheduleTaskItem)
+					})
+				}
 			}
 		}
 	}
@@ -194,7 +233,7 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 }
 
 func runRecurrently(scheduleTask model.ScheduleTask) {
-	if( scheduleTask.IsActive == true ) {
+	if ( scheduleTask.IsActive == true ) {
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
 		connection, err := getAmqpConnectionChannel()
 		if ( err != nil  ) {
@@ -215,13 +254,13 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 				})
 			}()
 		}
-	}else {
+	} else {
 		cronJob.w.RemoveFunc(scheduleTask.Id)
 	}
 }
 
 func runOnetime(scheduleTask model.ScheduleTask) {
-	if( scheduleTask.IsActive == true ) {
+	if ( scheduleTask.IsActive == true ) {
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
 		connection, err := getAmqpConnectionChannel()
 		if ( err != nil  ) {
@@ -248,7 +287,7 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 				})
 			}()
 		}
-	}else {
+	} else {
 		cronJob.w.RemoveFunc(scheduleTask.Id)
 	}
 }
@@ -313,6 +352,7 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 	}
 }
 
+// Get connection to AMQP server
 func getAmqpConnectionChannel() (*amqp.Connection, error) {
 	amqpConfig := amqpString["amqp"].(map[string]interface{})
 	amqpURI := fmt.Sprintf("amqp://%s:%s@%s:%s%s",
