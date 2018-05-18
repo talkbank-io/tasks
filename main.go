@@ -233,8 +233,8 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 
 }
 
-func runRecurrently(runScheduler model.ScheduleTask) {
-	scheduleTask, _ := database.GetSchedulerById(runScheduler.Id)
+func runRecurrently(scheduleTask model.ScheduleTask) {
+	//scheduleTask, _ := database.GetSchedulerById(runScheduler.Id)
 
 	if ( scheduleTask.IsActive == true ) {
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
@@ -262,8 +262,8 @@ func runRecurrently(runScheduler model.ScheduleTask) {
 	}
 }
 
-func runOnetime(runScheduler model.ScheduleTask) {
-	scheduleTask, _ := database.GetSchedulerById(runScheduler.Id)
+func runOnetime(scheduleTask model.ScheduleTask) {
+	//scheduleTask, _ := database.GetSchedulerById(runScheduler.Id)
 
 	if ( scheduleTask.IsActive == true ) {
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
