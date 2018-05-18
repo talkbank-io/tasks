@@ -203,35 +203,41 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 				})
 			}()
 		}
+	}else {
+		cronJob.w.RemoveFunc(scheduleTask.Id)
 	}
 }
 
 func runOnetime(scheduleTask model.ScheduleTask) {
-	publisherConfig := amqpString["publisher"].(map[string]interface{})
-	connection, err := getAmqpConnectionChannel()
-	if ( err != nil  ) {
-		fmt.Errorf("Channel connection is closed: %v", err)
-	}
+	if( scheduleTask.IsActive == true ) {
+		publisherConfig := amqpString["publisher"].(map[string]interface{})
+		connection, err := getAmqpConnectionChannel()
+		if ( err != nil  ) {
+			fmt.Errorf("Channel connection is closed: %v", err)
+		}
 
-	currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
-	fmt.Println(currentSchedulerTask)
+		currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
+		fmt.Println(currentSchedulerTask)
 
-	if ( err != nil  ) {
-		fmt.Errorf("Cant get schedule by ID: %v", err)
-	}
+		if ( err != nil  ) {
+			fmt.Errorf("Cant get schedule by ID: %v", err)
+		}
 
-	publisherQueue := publisher.NewPublisher(connection)
-	onetimeSchedule := schedule.NewOnetime(currentSchedulerTask, publisherQueue, database)
-	result := onetimeSchedule.Run(publisherConfig, cronJob.w)
+		publisherQueue := publisher.NewPublisher(connection)
+		onetimeSchedule := schedule.NewOnetime(currentSchedulerTask, publisherQueue, database)
+		result := onetimeSchedule.Run(publisherConfig, cronJob.w)
 
-	if ( len(result) > 0 ) {
+		if ( len(result) > 0 ) {
+			cronJob.w.RemoveFunc(scheduleTask.Id)
+			go func() {
+				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
+					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
+					go checkDeliveredUsers(publisherConfig, result, scheduleTask.Id, "onetime")
+				})
+			}()
+		}
+	}else {
 		cronJob.w.RemoveFunc(scheduleTask.Id)
-		go func() {
-			cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
-				fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
-				go checkDeliveredUsers(publisherConfig, result, scheduleTask.Id, "onetime")
-			})
-		}()
 	}
 }
 
