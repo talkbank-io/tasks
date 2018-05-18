@@ -241,13 +241,13 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 			fmt.Errorf("Channel connection is closed: %v", err)
 		}
 		currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
-		fmt.Println(currentSchedulerTask)
+
 		publisherQueue := publisher.NewPublisher(connection)
 		recurrentlyScheduler := schedule.NewRecurrently(currentSchedulerTask, publisherQueue, database)
 		result := recurrentlyScheduler.Run(publisherConfig, cronJob.w)
 
 		if ( len(result) > 0 ) {
-
+			cronJob.w.ResumeFunc(scheduleTask.Id)
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
 					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
@@ -269,7 +269,6 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 		}
 
 		currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
-		fmt.Println(currentSchedulerTask)
 
 		if ( err != nil  ) {
 			fmt.Errorf("Cant get schedule by ID: %v", err)
