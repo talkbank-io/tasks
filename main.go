@@ -124,18 +124,15 @@ func StartSchedulersJob() {
 	}
 
 	fmt.Printf("Count running jobs: %d\n", cronJob.w.EntriesCount())
-	for _, jobId := range cronJob.w.Entries() {
-		fmt.Println("Run job is:", jobId.Id)
-	}
-
 	fmt.Println("Len of the records:", len(resultSet))
+
 	fmt.Fprintf(writer, "Len of the records=%d\n", len(resultSet))
 	writer.Flush()
 
 	for _, scheduleItem := range resultSet {
 		scheduleTaskItem := scheduleItem
 
-		fmt.Printf("If job is running, jobID: %d, and status: %d\n", scheduleTaskItem.Id, cronJob.w.Status(scheduleTaskItem.Id))
+		fmt.Printf("Running jobID: %d, and status: %d\n", scheduleTaskItem.Id, cronJob.w.Status(scheduleTaskItem.Id))
 		if ( cronJob.w.Status(scheduleTaskItem.Id) != 1 || cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
 			if ( scheduleTaskItem.Type == "onetime" ) {
 				cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
@@ -154,6 +151,7 @@ func StartSchedulersJob() {
 					resultTemplate["month"],
 					resultTemplate["weekday"],
 				)
+				fmt.Println("Cronjob recurrently template", cronTemplate, scheduleTaskItem.Id)
 
 				cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
 					go runRecurrently(scheduleTaskItem)
