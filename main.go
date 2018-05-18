@@ -159,8 +159,13 @@ func StartSchedulersJob() {
 					fmt.Printf(
 						"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v\n",
 						time.Now().UTC(),
-						scheduleTaskItem.NextRun,
+						scheduleTaskItem.NextRun.UTC(),
 						entry.Next.UTC())
+
+					//nextRun := scheduleTaskItem.NextRun
+					//nextRunEntry := entry.Next.UTC()
+
+
 				}
 
 
