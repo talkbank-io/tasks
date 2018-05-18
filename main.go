@@ -154,12 +154,15 @@ func StartSchedulersJob() {
 				)
 				fmt.Println("Cronjob recurrently template", cronTemplate, scheduleTaskItem.Id)
 
-				entry := cronJob.w.EntryById(scheduleTaskItem.Id)
-				fmt.Printf(
-					"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v\n",
-					time.Now().UTC(),
-					scheduleTaskItem.NextRun,
-					entry.Next.UTC())
+				if( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
+					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
+					fmt.Printf(
+						"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v\n",
+						time.Now().UTC(),
+						scheduleTaskItem.NextRun,
+						entry.Next.UTC())
+				}
+
 
 				cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
 					go runRecurrently(scheduleTaskItem)
