@@ -66,6 +66,7 @@ func parseConfig() (map[string]interface{}, error) {
 }
 
 func main() {
+
 	flag.Parse()
 	fmt.Println(configFile)
 
@@ -191,7 +192,7 @@ func StartSchedulersJob() {
 
 				currentTime, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 				//jobNextRun :=
-				nextRunDate, _ := time.Parse("2006-01-02 15:04:00", scheduleTaskItem.NextRun.Format("2006-01-02 15:04:00"))
+				nextRunDate, _ := time.Parse("2006-01-02 15:04:00", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04:00"))
 
 				// если при запуске задачника мы находим recurrenllty задачу
 				// и понимаем что ее надо зупускать, потому что она не была запущена

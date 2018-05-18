@@ -32,7 +32,7 @@ func NewRecurrently(scheduleModel *model.ScheduleTask, pub *publisher.Publisher,
 func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob *cron.Cron) map[string]int {
 	entry := cronJob.EntryById(schedule.row.Id)
 
-	nextRun, _ := time.Parse("2006-01-02 15:04:00", schedule.row.NextRun.Format("2006-01-02 15:04:00"))
+	nextRun, _ := time.Parse("2006-01-02 15:04:00", schedule.row.NextRun.UTC().Format("2006-01-02 15:04:00"))
 	//fromDateTime, _ := time.Parse("2006-01-02 15:04:00", schedule.row.FromDatetime.Format("2006-01-02 15:04:00"))
 	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 
