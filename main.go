@@ -206,9 +206,9 @@ func StartSchedulersJob() {
 						nextRunDate)
 					go runRecurrently(scheduleTaskItem)
 				} else {
-					cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
+					/*cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
 						go runRecurrently(scheduleTaskItem)
-					})
+					})*/
 				}
 			}
 		}
