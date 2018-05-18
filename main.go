@@ -206,7 +206,7 @@ func StartSchedulersJob() {
 						nextRunDate)
 					go runRecurrently(scheduleTaskItem)
 				} else {
-					cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
+					cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
 						go runRecurrently(scheduleTaskItem)
 					})
 				}
@@ -233,7 +233,9 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 
 }
 
-func runRecurrently(scheduleTask model.ScheduleTask) {
+func runRecurrently(runScheduler model.ScheduleTask) {
+	scheduleTask, _ := database.GetSchedulerById(runScheduler.Id)
+
 	if ( scheduleTask.IsActive == true ) {
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
 		connection, err := getAmqpConnectionChannel()
@@ -260,7 +262,9 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 	}
 }
 
-func runOnetime(scheduleTask model.ScheduleTask) {
+func runOnetime(runScheduler model.ScheduleTask) {
+	scheduleTask, _ := database.GetSchedulerById(runScheduler.Id)
+
 	if ( scheduleTask.IsActive == true ) {
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
 		connection, err := getAmqpConnectionChannel()
