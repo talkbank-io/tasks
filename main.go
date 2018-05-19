@@ -15,7 +15,6 @@ import (
 	"github.com/killer-djon/tasks/schedule"
 	"github.com/killer-djon/tasks/publisher"
 	"os"
-	"time"
 )
 
 const (
@@ -146,15 +145,12 @@ func StartSchedulersJob() {
 		// или не в паузе тогда создаем задачу и запускаем ее
 		if ( cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1 ) {
 			if ( scheduleTaskItem.Type == "onetime" ) {
-				fmt.Printf("Run cronjob for onetime task=%d, at=%v\n", scheduleTaskItem.Id, time.Now().UTC())
 				cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
-					fmt.Printf("Job will be running: %d\n", scheduleTaskItem.Id)
 					go runOnetime(scheduleTaskItem)
 				})
 
 			} else {
 
-				/*
 				var resultTemplate = make(map[string]string)
 				json.Unmarshal([]byte(scheduleTaskItem.Template), &resultTemplate)
 
@@ -165,41 +161,10 @@ func StartSchedulersJob() {
 					resultTemplate["month"],
 					resultTemplate["weekday"],
 				)
-				fmt.Println("Cronjob recurrently template", cronTemplate, scheduleTaskItem.Id)
 
-				if ( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
-					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
-					entryNextRun := entry.Next.UTC()
-					scheduleNextRun := scheduleTaskItem.NextRun.UTC()
-					fmt.Printf(
-						"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v, is Equal nextrun=%v\n",
-						time.Now().UTC(),
-						scheduleTaskItem.NextRun.UTC(),
-						entry.Next.UTC(),
-						entryNextRun.Equal(scheduleNextRun))
-				}
-
-				currentTime, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
-				//jobNextRun :=
-				nextRunDate, _ := time.Parse("2006-01-02 15:04:00", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04:00"))
-
-				// если при запуске задачника мы находим recurrenllty задачу
-				// и понимаем что ее надо зупускать, потому что она не была запущена
-				// то мы ее запускаем
-				// иначе смотрим если дата следующего запуска больше текущей даты
-				// тогда запускаем задачник по расписанию в шаблоне
-				if ( nextRunDate.Equal(currentTime) && cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
-					fmt.Printf("Current time is equal to fromdate and run job=%d, current=%v, fromDate=%v\n",
-						scheduleTaskItem.Id,
-						currentTime,
-						nextRunDate)
+				cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
 					go runRecurrently(scheduleTaskItem)
-				} else {
-					cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
-						go runRecurrently(scheduleTaskItem)
-					})
-				}
-				*/
+				})
 			}
 		}
 	}
