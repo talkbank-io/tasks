@@ -48,77 +48,82 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 
 	var result = make(map[string]int, 2)
 
-	if ( nextRun.Equal(now) || nextRun.Add(time.Minute).Equal(now) ) {
-		// Если время следующего запуска совпадает с текущим временем
-		// мы запускаем задачу, стопорим cronjob до момент завершения задачи
-		// потом заного запускаем до следующего ожидания
-		// но при этом надо проверить если nextRun был послденим то мы удаляем job
-		hash, err := schedule.db.SaveHash(schedule.row.Id, schedule.row.Delivery.Id)
-		if ( err != nil ) {
-			fmt.Println("Error on save hash to massAction:", err, schedule.row.Id)
+	if( schedule.row.IsActive == true ) {
+		if ( nextRun.Equal(now) || nextRun.Add(time.Minute).Equal(now) ) {
+			// Если время следующего запуска совпадает с текущим временем
+			// мы запускаем задачу, стопорим cronjob до момент завершения задачи
+			// потом заного запускаем до следующего ожидания
+			// но при этом надо проверить если nextRun был послденим то мы удаляем job
+			hash, err := schedule.db.SaveHash(schedule.row.Id, schedule.row.Delivery.Id)
+			if ( err != nil ) {
+				fmt.Println("Error on save hash to massAction:", err, schedule.row.Id)
+				cronJob.RemoveFunc(schedule.row.Id)
+				return result
+			}
+
+			schedule.Hash = hash
+
+			schedule.db.SetIsRunning(schedule.row.Id, true)
+
+			start := time.Now()
+			fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
+			cronJob.PauseFunc(schedule.row.Id)
+
+			users, err := schedule.db.GetActiveUsers(schedule.row.Delivery.UserIds, schedule.row.Delivery.Filter)
+
+			if ( err != nil ) {
+				fmt.Println("Error to get users by params", err)
+				return result
+			}
+
+			countPublishing := 0
+			countUnPublished := 0
+
+			for _, user := range users {
+				q_message := &QueueMessage{
+					UserId: user.Id,
+					TaskId: schedule.row.Id,
+					MassActionId: schedule.row.Delivery.Id,
+					Text: schedule.row.Delivery.Text,
+					Coverage: len(users),
+					Hash: hash,
+				}
+
+				fmt.Println("Will be publis data of the recurrently:", q_message)
+
+				message, err := json.Marshal(q_message)
+				if err != nil {
+					fmt.Println("error:", err)
+					countUnPublished++
+				}
+
+				channel := schedule.pub
+				isPublish, err := channel.Publish(publisherConfig["queue_recurrently"].(string), message)
+
+				if err != nil {
+					fmt.Println("error on publishing:", err)
+					countUnPublished++
+				}
+
+				countPublishing++
+				fmt.Println("Message will be publish:", isPublish)
+
+				//time.Sleep(TIME_SLEEP_PUBLISH * time.Second)
+			}
+
+			result["countPublishing"] = countPublishing
+			result["countUnPublished"] = countUnPublished
+			result["lenUsers"] = len(users)
+
+			end := time.Now()
+			difference := end.Sub(start)
+
+			fmt.Printf("Time to resolve task: %v\n", difference)
+		}else{
 			cronJob.RemoveFunc(schedule.row.Id)
-			return result
 		}
-
-		schedule.Hash = hash
-
-		schedule.db.SetIsRunning(schedule.row.Id, true)
-
-		start := time.Now()
-		fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
-		cronJob.PauseFunc(schedule.row.Id)
-
-		users, err := schedule.db.GetActiveUsers(schedule.row.Delivery.UserIds, schedule.row.Delivery.Filter)
-
-		if ( err != nil ) {
-			fmt.Println("Error to get users by params", err)
-			return result
-		}
-
-		countPublishing := 0
-		countUnPublished := 0
-
-		for _, user := range users {
-			q_message := &QueueMessage{
-				UserId: user.Id,
-				TaskId: schedule.row.Id,
-				MassActionId: schedule.row.Delivery.Id,
-				Text: schedule.row.Delivery.Text,
-				Coverage: len(users),
-				Hash: hash,
-			}
-
-			fmt.Println("Will be publis data of the recurrently:", q_message)
-
-			message, err := json.Marshal(q_message)
-			if err != nil {
-				fmt.Println("error:", err)
-				countUnPublished++
-			}
-
-			channel := schedule.pub
-			isPublish, err := channel.Publish(publisherConfig["queue_recurrently"].(string), message)
-
-			if err != nil {
-				fmt.Println("error on publishing:", err)
-				countUnPublished++
-			}
-
-			countPublishing++
-			fmt.Println("Message will be publish:", isPublish)
-
-			//time.Sleep(TIME_SLEEP_PUBLISH * time.Second)
-		}
-
-		result["countPublishing"] = countPublishing
-		result["countUnPublished"] = countUnPublished
-		result["lenUsers"] = len(users)
-
-		end := time.Now()
-		difference := end.Sub(start)
-
-		fmt.Printf("Time to resolve task: %v\n", difference)
 	}
+
 
 	return result
 
