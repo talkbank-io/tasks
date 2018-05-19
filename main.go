@@ -238,9 +238,9 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 		onetimeSchedule := schedule.NewOnetime(currentSchedulerTask, publisherQueue, database)
 		result := onetimeSchedule.Run(publisherConfig, cronJob.w)
 		hash := onetimeSchedule.GetCurrentHash()
-		cronJob.w.RemoveFunc(scheduleTask.Id)
-		if ( len(result) > 0 ) {
 
+		if ( len(result) > 0 ) {
+			cronJob.w.RemoveFunc(scheduleTask.Id)
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
 					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
