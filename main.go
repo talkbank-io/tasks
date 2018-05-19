@@ -146,26 +146,15 @@ func StartSchedulersJob() {
 		// или не в паузе тогда создаем задачу и запускаем ее
 		if ( cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1 ) {
 			if ( scheduleTaskItem.Type == "onetime" ) {
-				currentTime, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
-				fromDate, _ := time.Parse("2006-01-02 15:04:00", scheduleTaskItem.FromDatetime.Format("2006-01-02 15:04:00"))
-
-				if ( fromDate.Equal(currentTime) &&
-					cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
-					fmt.Printf("Current time is equal to fromdate and run job=%d, current=%v, fromDate=%v\n",
-						scheduleTaskItem.Id,
-						currentTime,
-						fromDate)
+				fmt.Printf("Run cronjob for onetime task=%d, at=%v\n", scheduleTaskItem.Id, time.Now().UTC())
+				cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
+					fmt.Printf("Job will be running: %d\n", scheduleTaskItem.Id)
 					go runOnetime(scheduleTaskItem)
-				} else {
-					fmt.Printf("Run cronjob for onetime task=%d, at=%v\n", scheduleTaskItem.Id, time.Now().UTC())
-					cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
-						fmt.Printf("Job will be running: %d\n", scheduleTaskItem.Id)
-						go runOnetime(scheduleTaskItem)
-					})
-				}
+				})
 
 			} else {
 
+				/*
 				var resultTemplate = make(map[string]string)
 				json.Unmarshal([]byte(scheduleTaskItem.Template), &resultTemplate)
 
@@ -206,10 +195,11 @@ func StartSchedulersJob() {
 						nextRunDate)
 					go runRecurrently(scheduleTaskItem)
 				} else {
-					/*cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
+					cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
 						go runRecurrently(scheduleTaskItem)
-					})*/
+					})
 				}
+				*/
 			}
 		}
 	}
