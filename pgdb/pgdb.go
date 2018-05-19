@@ -91,14 +91,14 @@ func (pgmodel *PgDB) SetIsRunning(Id int, isRunning bool) {
 func (pgmodel *PgDB) SaveHash(scheduleId, deliveryId int) (string, error) {
 
 	hash := sha256.New()
-	hash.Write([]byte(time.Now().UTC().Format("2006-01-02 15:04:00")))
+	hash.Write([]byte(time.Now().UTC().Format("2006-01-02 15:04:05")))
 	hash.Write([]byte(strconv.Itoa(scheduleId)))
 	hash.Write([]byte(strconv.Itoa(deliveryId)))
 
 	sum := hash.Sum(nil)
 	stringHash := base64.URLEncoding.EncodeToString(sum)
 
-	fmt.Println("New hash instance", stringHash, time.Now().UTC().Format("2006-01-02 15:04"))
+	fmt.Println("New hash instance", stringHash, time.Now().UTC().Format("2006-01-02 15:04:05"))
 
 	hashSet, err := pgmodel.SetHashAction(deliveryId, stringHash)
 
@@ -112,7 +112,7 @@ func (pgmodel *PgDB) SaveHash(scheduleId, deliveryId int) (string, error) {
 
 // return PendingTask::where('planned', '<=', Carbon::now('UTC'))->get();
 func (pgmodel *PgDB) SelectPendingTasks() ([]model.PendingTask, error) {
-	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
+	now, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
 
 	scheduleRepository := model.NewScheduleRepository()
 	pendingModel := scheduleRepository.GetPendingTaskModel()
