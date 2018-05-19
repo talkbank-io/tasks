@@ -236,7 +236,13 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 		hash := recurrentlyScheduler.GetCurrentHash()
 
 		if ( len(result) > 0 ) {
-			cronJob.w.ResumeFunc(scheduleTask.Id)
+
+			if( currentSchedulerTask.IsActive == true ) {
+				cronJob.w.ResumeFunc(currentSchedulerTask.Id)
+			}else{
+				cronJob.w.RemoveFunc(currentSchedulerTask.Id)
+			}
+
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
 					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
