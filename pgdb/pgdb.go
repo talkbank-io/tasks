@@ -91,8 +91,9 @@ func (pgmodel *PgDB) SetIsRunning(Id int, isRunning bool) {
 func (pgmodel *PgDB) SaveHash(scheduleId, deliveryId int) (string, error) {
 
 	hash := sha256.New()
-	hash.Write([]byte(time.Now().UTC().Format("2006-01-02 15:04")))
+	hash.Write([]byte(time.Now().UTC().Format("2006-01-02 15:04:00")))
 	hash.Write([]byte(strconv.Itoa(scheduleId)))
+	hash.Write([]byte(strconv.Itoa(deliveryId)))
 
 	sum := hash.Sum(nil)
 	stringHash := base64.URLEncoding.EncodeToString(sum)

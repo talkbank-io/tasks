@@ -62,7 +62,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 		hash, err := schedule.db.SaveHash(schedule.row.Id, schedule.row.Delivery.Id)
 		if ( err != nil ) {
 			fmt.Println(err)
-			cronJob.ResumeFunc(schedule.row.Id)
+			cronJob.RemoveFunc(schedule.row.Id)
 			return result
 		}
 

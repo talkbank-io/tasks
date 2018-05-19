@@ -151,7 +151,7 @@ func StartSchedulersJob() {
 
 			} else {
 
-				var resultTemplate = make(map[string]string)
+				/*var resultTemplate = make(map[string]string)
 				json.Unmarshal([]byte(scheduleTaskItem.Template), &resultTemplate)
 
 				cronTemplate := fmt.Sprintf("0 %s %s %s %s %s",
@@ -164,7 +164,7 @@ func StartSchedulersJob() {
 
 				cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
 					go runRecurrently(scheduleTaskItem)
-				})
+				})*/
 			}
 		}
 	}
