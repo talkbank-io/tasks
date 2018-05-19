@@ -15,6 +15,7 @@ type Recurrently struct {
 	row *model.ScheduleTask
 	pub *publisher.Publisher
 	db  *pgdb.PgDB
+	Hash string
 }
 
 // Constructor
@@ -58,6 +59,8 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 			cronJob.RemoveFunc(schedule.row.Id)
 			return result
 		}
+
+		schedule.Hash = hash
 
 		schedule.db.SetIsRunning(schedule.row.Id, true)
 
@@ -119,6 +122,10 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 
 	return result
 
+}
+
+func (schedule *Recurrently) GetCurrentHash() string {
+	return schedule.Hash
 }
 
 func (schedule *Recurrently) SendTransmitStatistic(publisherConfig map[string]interface{}, result map[string]int) bool {

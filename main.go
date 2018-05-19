@@ -202,13 +202,14 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 		publisherQueue := publisher.NewPublisher(connection)
 		recurrentlyScheduler := schedule.NewRecurrently(currentSchedulerTask, publisherQueue, database)
 		result := recurrentlyScheduler.Run(publisherConfig, cronJob.w)
+		hash := recurrentlyScheduler.GetCurrentHash()
 
 		if ( len(result) > 0 ) {
 			cronJob.w.ResumeFunc(scheduleTask.Id)
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
 					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
-					go checkDeliveredUsers(publisherConfig, result, scheduleTask.Id, "recurrently")
+					go checkDeliveredUsers(publisherConfig, result, scheduleTask.Id, "recurrently", hash)
 				})
 			}()
 		}
@@ -236,13 +237,14 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 		publisherQueue := publisher.NewPublisher(connection)
 		onetimeSchedule := schedule.NewOnetime(currentSchedulerTask, publisherQueue, database)
 		result := onetimeSchedule.Run(publisherConfig, cronJob.w)
+		hash := onetimeSchedule.GetCurrentHash()
 
 		if ( len(result) > 0 ) {
 			cronJob.w.RemoveFunc(scheduleTask.Id)
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
 					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
-					go checkDeliveredUsers(publisherConfig, result, scheduleTask.Id, "onetime")
+					go checkDeliveredUsers(publisherConfig, result, scheduleTask.Id, "onetime", hash)
 				})
 			}()
 		}
@@ -251,9 +253,9 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 	}
 }
 
-func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[string]int, scheduleId int, actionTipe string) {
+func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[string]int, scheduleId int, actionType, hash string) {
 
-	countUsersDelivery, _ := database.GetUserDeliveryCountByHash(result, scheduleId)
+	countUsersDelivery, _ := database.GetUserDeliveryCountByHash(result, scheduleId, hash)
 
 	fmt.Printf("Count of users_delivery now: %d, coverage: %d", countUsersDelivery, result["lenUsers"])
 	if ( countUsersDelivery == result["lenUsers"] ) {
@@ -262,7 +264,7 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 			PublishCount: result["countPublishing"],
 			UnpublishCount: result["lenUsers"] - result["countPublishing"],
 			ScheduleId: scheduleId,
-			ActionType: actionTipe,
+			ActionType: actionType,
 		}
 
 		finalize_message, err := json.Marshal(finalize)

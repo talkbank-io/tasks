@@ -19,6 +19,7 @@ type Onetime struct {
 	users []*model.Users
 	pub   *publisher.Publisher
 	db    *pgdb.PgDB
+	Hash  string
 }
 
 type QueueMessage struct {
@@ -65,6 +66,9 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 			cronJob.RemoveFunc(schedule.row.Id)
 			return result
 		}
+
+		schedule.Hash = hash
+		schedule.db.SetIsRunning(schedule.row.Id, true)
 
 		start := time.Now()
 		fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
@@ -121,6 +125,10 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 	}
 
 	return result
+}
+
+func (schedule *Onetime) GetCurrentHash() string {
+	return schedule.Hash
 }
 
 func (schedule *Onetime) SendTransmitStatistic(publisherConfig map[string]interface{}, result map[string]int) bool {

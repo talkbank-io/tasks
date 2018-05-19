@@ -211,13 +211,15 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 
 }
 
-func (pgmodel *PgDB) GetUserDeliveryCountByHash(result map[string]int, scheduleId int) (int, error) {
+func (pgmodel *PgDB) GetUserDeliveryCountByHash(result map[string]int, scheduleId int, hash string) (int, error) {
 
+	/*
 	scheduleModel, errDb := pgmodel.GetSchedulerById(scheduleId)
 	if( errDb != nil ) {
 		fmt.Printf("Erro to get schedule by ID: %d, %v\n", scheduleId, errDb)
 		return 0, errDb
 	}
+	*/
 
 	userDeliveryModel := &model.UserDelivery{}
 	count, err := pgmodel.db.Model(userDeliveryModel).
@@ -225,7 +227,7 @@ func (pgmodel *PgDB) GetUserDeliveryCountByHash(result map[string]int, scheduleI
 		ColumnExpr("delivery.id AS delivery__id").
 		ColumnExpr("delivery.delivery_hash AS delivery__hash").
 		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = user_delivery.delivery_id").
-		Where("user_delivery.delivery_hash = ?", scheduleModel.Delivery.ActionHash).
+		Where("user_delivery.delivery_hash = ?", hash).
 		Count()
 
 	if err != nil {
@@ -233,7 +235,7 @@ func (pgmodel *PgDB) GetUserDeliveryCountByHash(result map[string]int, scheduleI
 		return 0, err
 	}
 
-	fmt.Println("Finded count by hash", result["lenUsers"], count, scheduleModel.Delivery.ActionHash)
+	fmt.Println("Finded count by hash", result["lenUsers"], count, hash)
 
 	if( result["lenUsers"] == count ) {
 		return count, nil
