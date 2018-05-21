@@ -80,7 +80,6 @@ func (pgmodel *PgDB) SetIsRunning(Id int, isRunning bool) {
 	_, err := pgmodel.db.Model(&model.ScheduleTask{}).
 		Set("is_running = ?", isRunning).
 		Where("id = ?", Id).
-		Returning("is_running").
 		Update()
 
 	if( err != nil ) {

@@ -10,11 +10,10 @@ import (
 	"github.com/killer-djon/cron"
 )
 
-
 type Recurrently struct {
-	row *model.ScheduleTask
-	pub *publisher.Publisher
-	db  *pgdb.PgDB
+	row  *model.ScheduleTask
+	pub  *publisher.Publisher
+	db   *pgdb.PgDB
 	Hash string
 }
 
@@ -37,7 +36,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 	//fromDateTime, _ := time.Parse("2006-01-02 15:04:00", schedule.row.FromDatetime.Format("2006-01-02 15:04:00"))
 	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 
-	if( entry != nil ) {
+	if ( entry != nil ) {
 		fmt.Printf("Recurrently entry to be runned: JobPrev time=%v, JobNext time=%v, Now time=%v, Next runtime=%v\n",
 			entry.Prev,
 			entry.Next,
@@ -45,10 +44,9 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 			nextRun)
 	}
 
+	var result = make(map[string]int)
 
-	var result = make(map[string]int, 2)
-
-	if( schedule.row.IsActive == true ) {
+	if ( schedule.row.IsActive == true ) {
 		if ( nextRun.Equal(now) || nextRun.Add(time.Minute).Equal(now) ) {
 			// Если время следующего запуска совпадает с текущим временем
 			// мы запускаем задачу, стопорим cronjob до момент завершения задачи
@@ -119,11 +117,10 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 			difference := end.Sub(start)
 
 			fmt.Printf("Time to resolve task: %v\n", difference)
-		}else{
-			cronJob.RemoveFunc(schedule.row.Id)
 		}
+	} else {
+		cronJob.RemoveFunc(schedule.row.Id)
 	}
-
 
 	return result
 

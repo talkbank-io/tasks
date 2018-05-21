@@ -1,7 +1,6 @@
 package schedule
 
 import (
-
 	"fmt"
 	"time"
 	"encoding/json"
@@ -11,12 +10,11 @@ import (
 )
 
 type Pending struct {
-	rows   []model.PendingTask
+	rows  []model.PendingTask
 	users []*model.Users
 	pub   *publisher.Publisher
-	db	*pgdb.PgDB
+	db    *pgdb.PgDB
 }
-
 
 func NewPending(pendingTasks []model.PendingTask, pub *publisher.Publisher, database *pgdb.PgDB) *Pending {
 	return &Pending{
@@ -26,17 +24,15 @@ func NewPending(pendingTasks []model.PendingTask, pub *publisher.Publisher, data
 	}
 }
 
-
 func (pending *Pending) Run(publisherConfig map[string]interface{}) {
 	fmt.Println("All records pending:", pending.rows[0].ScheduleTask.Id, pending.rows[0].Delivery.Id)
 
 	start := time.Now()
 	for _, pendingItem := range pending.rows {
 		hash, err := pending.db.SaveHash(pendingItem.ScheduleTask.Id, pendingItem.Delivery.Id)
-		if( err != nil ){
+		if ( err != nil ) {
 			fmt.Println("Error on set hash:", err)
 		}
-
 
 		q_message := &QueueMessage{
 			UserId: pendingItem.UserId,
@@ -61,6 +57,7 @@ func (pending *Pending) Run(publisherConfig map[string]interface{}) {
 
 		fmt.Println("Message will be publish:", isPublish)
 	}
+
 	end := time.Now()
 	difference := end.Sub(start)
 

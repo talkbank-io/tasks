@@ -220,16 +220,15 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 }
 
 func runRecurrently(scheduleTask model.ScheduleTask) {
-	//scheduleTask, _ := database.GetSchedulerById(runScheduler.Id)
 
-	if ( scheduleTask.IsActive == true ) {
-		publisherConfig := amqpString["publisher"].(map[string]interface{})
-		connection, err := getAmqpConnectionChannel()
-		if ( err != nil  ) {
-			fmt.Errorf("Channel connection is closed: %v", err)
-		}
-		currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
+	publisherConfig := amqpString["publisher"].(map[string]interface{})
+	connection, err := getAmqpConnectionChannel()
+	if ( err != nil  ) {
+		fmt.Errorf("Channel connection is closed: %v", err)
+	}
+	currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
 
+	if ( currentSchedulerTask.IsActive == true ) {
 		publisherQueue := publisher.NewPublisher(connection)
 		recurrentlyScheduler := schedule.NewRecurrently(currentSchedulerTask, publisherQueue, database)
 		result := recurrentlyScheduler.Run(publisherConfig, cronJob.w)
@@ -237,9 +236,9 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 
 		if ( len(result) > 0 ) {
 
-			if( currentSchedulerTask.IsActive == true ) {
+			if ( currentSchedulerTask.IsActive == true ) {
 				cronJob.w.ResumeFunc(currentSchedulerTask.Id)
-			}else{
+			} else {
 				cronJob.w.RemoveFunc(currentSchedulerTask.Id)
 			}
 
@@ -251,32 +250,33 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 			}()
 		}
 	} else {
-		cronJob.w.RemoveFunc(scheduleTask.Id)
+		cronJob.w.RemoveFunc(currentSchedulerTask.Id)
 	}
+
 }
 
 func runOnetime(scheduleTask model.ScheduleTask) {
-	//scheduleTask, _ := database.GetSchedulerById(runScheduler.Id)
 
-	if ( scheduleTask.IsActive == true ) {
-		publisherConfig := amqpString["publisher"].(map[string]interface{})
-		connection, err := getAmqpConnectionChannel()
-		if ( err != nil  ) {
-			fmt.Errorf("Channel connection is closed: %v", err)
-		}
+	publisherConfig := amqpString["publisher"].(map[string]interface{})
+	connection, err := getAmqpConnectionChannel()
+	if ( err != nil  ) {
+		fmt.Errorf("Channel connection is closed: %v", err)
+	}
 
-		currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
+	currentSchedulerTask, err := database.GetSchedulerById(scheduleTask.Id)
 
-		if ( err != nil  ) {
-			fmt.Errorf("Cant get schedule by ID: %v", err)
-		}
+	if ( err != nil  ) {
+		fmt.Errorf("Cant get schedule by ID: %v", err)
+	}
 
+	if ( currentSchedulerTask.IsActive == true ) {
 		publisherQueue := publisher.NewPublisher(connection)
 		onetimeSchedule := schedule.NewOnetime(currentSchedulerTask, publisherQueue, database)
 		result := onetimeSchedule.Run(publisherConfig, cronJob.w)
 		hash := onetimeSchedule.GetCurrentHash()
 
 		if ( len(result) > 0 ) {
+			defer publisherQueue.Close()
 			cronJob.w.RemoveFunc(scheduleTask.Id)
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
@@ -286,15 +286,16 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 			}()
 		}
 	} else {
-		cronJob.w.RemoveFunc(scheduleTask.Id)
+		cronJob.w.RemoveFunc(currentSchedulerTask.Id)
 	}
+
 }
 
 func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[string]int, scheduleId int, actionType, hash string) {
 
 	countUsersDelivery, _ := database.GetUserDeliveryCountByHash(result, scheduleId, hash)
 
-	fmt.Printf("Count of users_delivery now: %d, coverage: %d", countUsersDelivery, result["lenUsers"])
+	fmt.Printf("Count of users_delivery now: %d, coverage: %d\n", countUsersDelivery, result["lenUsers"])
 	if ( countUsersDelivery == result["lenUsers"] ) {
 		finalize := &schedule.FinalizeMessage{
 			CoverageCount:  result["lenUsers"],
@@ -316,6 +317,8 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 		if err != nil {
 			fmt.Println("error on publishing:", err)
 		}
+
+		defer publisherQueue.Close()
 
 		if ( isPublish == true ) {
 			fmt.Printf(

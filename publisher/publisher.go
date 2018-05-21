@@ -21,12 +21,17 @@ func NewPublisher(conn *amqp.Connection) *Publisher {
 	}
 }
 
+func (pub *Publisher) Close() {
+	go pub.conn.Close()
+}
+
 /**
 * Публикация данных в очередь
 */
 func (pub *Publisher) Publish(queue_name string, message []byte) (bool, error) {
 
 	fmt.Println("Queue to publish:", queue_name)
+
 	c, err := pub.conn.Channel()
 	if err != nil {
 		log.Fatalf("channel.open: %v", err)
@@ -63,6 +68,7 @@ func (pub *Publisher) Publish(queue_name string, message []byte) (bool, error) {
 			Body:         message,
 		},
 	)
+
 	if err != nil {
 		log.Fatalf("basic.publish: %v", err)
 		return false, err
