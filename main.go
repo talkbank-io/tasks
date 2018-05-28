@@ -70,6 +70,9 @@ func main() {
 	flag.Parse()
 	fmt.Println(configFile)
 
+	localTime := time.Now().Local()
+	fmt.Println("Local time on the system:", localTime)
+
 	amqpString, _ = parseConfig()
 
 	config := amqpString["database"].(map[string]interface{})
@@ -164,7 +167,7 @@ func StartSchedulersJob() {
 					resultTemplate["month"],
 					resultTemplate["weekday"],
 				)
-				
+
 				fmt.Println("Cronjob recurrently template", cronTemplate, scheduleTaskItem.Id)
 				currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
 				nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
