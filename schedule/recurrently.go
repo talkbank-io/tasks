@@ -10,8 +10,6 @@ import (
 	"github.com/killer-djon/cron"
 )
 
-var localTimeLocation, _ = time.LoadLocation("Europe/Moscow")
-
 type Recurrently struct {
 	row  *model.ScheduleTask
 	pub  *publisher.Publisher
@@ -34,8 +32,8 @@ func NewRecurrently(scheduleModel *model.ScheduleTask, pub *publisher.Publisher,
 func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob *cron.Cron) map[string]int {
 	entry := cronJob.EntryById(schedule.row.Id)
 
-	nextRun, _ := time.ParseInLocation("2006-01-02 15:04", schedule.row.NextRun.Format("2006-01-02 15:04"), localTimeLocation)
-	now, _ := time.ParseInLocation("2006-01-02 15:04", time.Now().Format("2006-01-02 15:04"), localTimeLocation)
+	nextRun, _ := time.Parse("2006-01-02 15:04", schedule.row.NextRun.UTC().Format("2006-01-02 15:04"))
+	now, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
 
 	if ( entry != nil ) {
 		fmt.Printf("Recurrently entry to be runned: JobPrev time=%v, JobNext time=%v, Now time=%v, Next runtime=%v\n",
@@ -49,6 +47,9 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 
 	if ( schedule.row.IsActive == true ) {
 		if ( nextRun.Equal(now) || nextRun.Add(time.Minute).Equal(now) ) {
+			fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
+			cronJob.PauseFunc(schedule.row.Id)
+
 			// Если время следующего запуска совпадает с текущим временем
 			// мы запускаем задачу, стопорим cronjob до момент завершения задачи
 			// потом заного запускаем до следующего ожидания
@@ -65,9 +66,6 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 			schedule.db.SetIsRunning(schedule.row.Id, true)
 
 			start := time.Now()
-			fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
-			cronJob.PauseFunc(schedule.row.Id)
-
 			users, err := schedule.db.GetActiveUsers(schedule.row.Delivery.UserIds, schedule.row.Delivery.Filter)
 
 			if ( err != nil ) {
