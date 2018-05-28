@@ -71,7 +71,7 @@ func main() {
 	fmt.Println(configFile)
 
 	localTime := time.Now().Local()
-	fmt.Println("Local time on the system:", localTime)
+	fmt.Println("Local time on the system:", localTime, ", Is zero:", localTime.IsZero())
 
 	amqpString, _ = parseConfig()
 
