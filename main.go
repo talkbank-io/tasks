@@ -167,12 +167,12 @@ func StartSchedulersJob() {
 				)
 
 				fmt.Println("Cronjob recurrently template", cronTemplate, scheduleTaskItem.Id)
-				currentTime, _ := time.ParseInLocation("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"), localTimeLocation)
-				nextRunDate, _ := time.ParseInLocation("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"), localTimeLocation)
+				currentTime, _ := time.ParseInLocation("2006-01-02 15:04", time.Now().Format("2006-01-02 15:04"), localTimeLocation)
+				nextRunDate, _ := time.ParseInLocation("2006-01-02 15:04", scheduleTaskItem.NextRun.Format("2006-01-02 15:04"), localTimeLocation)
 
 				if ( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
 					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
-					entryNextRun, _ := time.ParseInLocation("2006-01-02 15:04", entry.Next.UTC().Format("2006-01-02 15:04"), localTimeLocation)
+					entryNextRun, _ := time.ParseInLocation("2006-01-02 15:04", entry.Next.Format("2006-01-02 15:04"), localTimeLocation)
 
 					fmt.Printf(
 						"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v, is Equal nextrun=%v\n",
