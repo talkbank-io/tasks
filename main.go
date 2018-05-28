@@ -163,38 +163,30 @@ func StartSchedulersJob() {
 					resultTemplate["weekday"],
 				)
 				fmt.Println("Cronjob recurrently template", cronTemplate, scheduleTaskItem.Id)
+				currentTime, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
+				nextRunDate, _ := time.Parse("2006-01-02 15:04:00", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04:00"))
 
 				if ( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
 					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
-					entryNextRun := entry.Next.UTC()
-					scheduleNextRun := scheduleTaskItem.NextRun.UTC()
+					entryNextRun, _ := time.Parse("2006-01-02 15:04:00", entry.Next.UTC().Format("2006-01-02 15:04:00"))
 					fmt.Printf(
 						"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v, is Equal nextrun=%v\n",
-						time.Now().UTC(),
-						scheduleTaskItem.NextRun.UTC(),
-						entry.Next.UTC(),
-						entryNextRun.Equal(scheduleNextRun))
+						currentTime,
+						nextRunDate,
+						entryNextRun,
+						nextRunDate.Equal(currentTime))
 				}
 
-				currentTime, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
-				nextRunDate, _ := time.Parse("2006-01-02 15:04:00", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04:00"))
+
 
 				// если при запуске задачника мы находим recurrenllty задачу
 				// и понимаем что ее надо зупускать, потому что она не была запущена
 				// то мы ее запускаем
 				// иначе смотрим если дата следующего запуска больше текущей даты
 				// тогда запускаем задачник по расписанию в шаблоне
-				if ( nextRunDate.Equal(currentTime) && cronJob.w.Status(scheduleTaskItem.Id) == -1 ) {
-					fmt.Printf("Current time is equal to fromdate and run job=%d, current=%v, fromDate=%v\n",
-						scheduleTaskItem.Id,
-						currentTime,
-						nextRunDate)
+				cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
 					go runRecurrently(scheduleTaskItem)
-				} else {
-					cronJob.w.AddFunc(cronTemplate, scheduleTaskItem.Id, func() {
-						go runRecurrently(scheduleTaskItem)
-					})
-				}
+				})
 			}
 		}
 	}
@@ -230,6 +222,7 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 
 	if ( currentSchedulerTask.IsActive == true ) {
 		publisherQueue := publisher.NewPublisher(connection)
+
 		recurrentlyScheduler := schedule.NewRecurrently(currentSchedulerTask, publisherQueue, database)
 		result := recurrentlyScheduler.Run(publisherConfig, cronJob.w)
 		hash := recurrentlyScheduler.GetCurrentHash()
@@ -243,9 +236,9 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 			}
 
 			go func() {
-				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
+				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (currentSchedulerTask.Id * 1000), func() {
 					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
-					go checkDeliveredUsers(publisherConfig, result, scheduleTask.Id, "recurrently", hash)
+					go checkDeliveredUsers(publisherConfig, result, currentSchedulerTask.Id, "recurrently", hash)
 				})
 			}()
 		}
@@ -276,8 +269,8 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 		hash := onetimeSchedule.GetCurrentHash()
 
 		if ( len(result) > 0 ) {
-			defer publisherQueue.Close()
 			cronJob.w.RemoveFunc(scheduleTask.Id)
+
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (scheduleTask.Id * 1000), func() {
 					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
@@ -337,18 +330,7 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 			writer.Flush()
 			cronJob.w.RemoveFunc(scheduleId * 1000)
 
-			currentScheduler, _ := database.GetSchedulerById(scheduleId)
 			database.SetIsRunning(scheduleId, false)
-
-			if ( currentScheduler.Type == "onetime" ) {
-				cronJob.w.RemoveFunc(scheduleId)
-			} else {
-				if ( currentScheduler.IsActive == false ) {
-					cronJob.w.RemoveFunc(scheduleId)
-				} else {
-					cronJob.w.ResumeFunc(scheduleId)
-				}
-			}
 		}
 	}
 }
