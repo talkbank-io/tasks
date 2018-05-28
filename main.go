@@ -71,7 +71,7 @@ func main() {
 	fmt.Println(configFile)
 
 	localTime := time.Now().Local()
-	fmt.Println("Local time on the system:", localTime, ", Is zero:", localTime.IsZero())
+	fmt.Println("Local time on the system:", localTime)
 
 	amqpString, _ = parseConfig()
 
@@ -102,9 +102,6 @@ func main() {
 	}
 	defer logFile.Close()
 	writer = bufio.NewWriter(logFile)
-
-	time.LoadLocation("Europe/Moscow")
-
 	cronJob.w.AddFunc(CRON_ONETIME_FORMAT, 0, func() {
 		pendings, err := database.SelectPendingTasks()
 		if ( err != nil ) {
@@ -169,8 +166,8 @@ func StartSchedulersJob() {
 				)
 
 				fmt.Println("Cronjob recurrently template", cronTemplate, scheduleTaskItem.Id)
-				currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
-				nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
+				currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().Local().UTC().Format("2006-01-02 15:04"))
+				nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.Local().UTC().Format("2006-01-02 15:04"))
 
 				if ( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
 					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
