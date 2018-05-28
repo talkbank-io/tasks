@@ -10,6 +10,8 @@ import (
 	"github.com/killer-djon/cron"
 )
 
+var localTimeLocation, _ = time.LoadLocation("Europe/Moscow")
+
 type Recurrently struct {
 	row  *model.ScheduleTask
 	pub  *publisher.Publisher
@@ -32,8 +34,8 @@ func NewRecurrently(scheduleModel *model.ScheduleTask, pub *publisher.Publisher,
 func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob *cron.Cron) map[string]int {
 	entry := cronJob.EntryById(schedule.row.Id)
 
-	nextRun, _ := time.Parse("2006-01-02 15:04", schedule.row.NextRun.Local().UTC().Format("2006-01-02 15:04"))
-	now, _ := time.Parse("2006-01-02 15:04", time.Now().Local().UTC().Format("2006-01-02 15:04"))
+	nextRun, _ := time.ParseInLocation("2006-01-02 15:04", schedule.row.NextRun.UTC().Format("2006-01-02 15:04"), localTimeLocation)
+	now, _ := time.ParseInLocation("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"), localTimeLocation)
 
 	if ( entry != nil ) {
 		fmt.Printf("Recurrently entry to be runned: JobPrev time=%v, JobNext time=%v, Now time=%v, Next runtime=%v\n",

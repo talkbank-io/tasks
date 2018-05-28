@@ -28,6 +28,7 @@ const (
 var configFile string
 var amqpString map[string]interface{}
 var configDB = make(map[string]string)
+var localTimeLocation, _ = time.LoadLocation("Europe/Moscow")
 
 var database *pgdb.PgDB
 
@@ -166,12 +167,12 @@ func StartSchedulersJob() {
 				)
 
 				fmt.Println("Cronjob recurrently template", cronTemplate, scheduleTaskItem.Id)
-				currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().Local().UTC().Format("2006-01-02 15:04"))
-				nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.Local().UTC().Format("2006-01-02 15:04"))
+				currentTime, _ := time.ParseInLocation("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"), localTimeLocation)
+				nextRunDate, _ := time.ParseInLocation("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"), localTimeLocation)
 
 				if ( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
 					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
-					entryNextRun, _ := time.Parse("2006-01-02 15:04", entry.Next.UTC().Format("2006-01-02 15:04"))
+					entryNextRun, _ := time.ParseInLocation("2006-01-02 15:04", entry.Next.UTC().Format("2006-01-02 15:04"), localTimeLocation)
 
 					fmt.Printf(
 						"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v, is Equal nextrun=%v\n",
