@@ -100,6 +100,8 @@ func main() {
 	defer logFile.Close()
 	writer = bufio.NewWriter(logFile)
 
+	time.LoadLocation("Europe/Moscow")
+
 	cronJob.w.AddFunc(CRON_ONETIME_FORMAT, 0, func() {
 		pendings, err := database.SelectPendingTasks()
 		if ( err != nil ) {
