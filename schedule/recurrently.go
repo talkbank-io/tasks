@@ -46,7 +46,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 	var result = make(map[string]int)
 
 	if ( schedule.row.IsActive == true ) {
-		if ( nextRun.Equal(now) || nextRun.Add(time.Minute).Equal(now) ) {
+		if ( nextRun.Equal(now) ) {
 			fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
 			cronJob.PauseFunc(schedule.row.Id)
 
