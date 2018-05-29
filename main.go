@@ -234,11 +234,7 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 
 		if ( len(result) > 0 ) {
 
-			if ( currentSchedulerTask.IsActive == true ) {
-				cronJob.w.ResumeFunc(currentSchedulerTask.Id)
-			} else {
-				cronJob.w.RemoveFunc(currentSchedulerTask.Id)
-			}
+			cronJob.w.RemoveFunc(scheduleTask.Id)
 
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (currentSchedulerTask.Id * 1000), func() {
