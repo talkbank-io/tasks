@@ -39,7 +39,7 @@ func (pending *Pending) Run(publisherConfig map[string]interface{}) {
 			TaskId: pendingItem.ScheduleTask.Id,
 			MassActionId: pendingItem.Delivery.Id,
 			Text: pendingItem.Delivery.Text,
-			Coverage: 1,
+			Coverage: len(pending.rows),
 			Hash: hash,
 		}
 

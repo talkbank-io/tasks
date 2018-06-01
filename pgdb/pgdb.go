@@ -212,14 +212,6 @@ func (pgmodel *PgDB) SelectCurrentScheduler() ([]model.ScheduleTask, error) {
 
 func (pgmodel *PgDB) GetUserDeliveryCountByHash(result map[string]int, scheduleId int, hash string) (int, error) {
 
-	/*
-	scheduleModel, errDb := pgmodel.GetSchedulerById(scheduleId)
-	if( errDb != nil ) {
-		fmt.Printf("Erro to get schedule by ID: %d, %v\n", scheduleId, errDb)
-		return 0, errDb
-	}
-	*/
-
 	userDeliveryModel := &model.UserDelivery{}
 	count, err := pgmodel.db.Model(userDeliveryModel).
 		ColumnExpr("user_delivery.*").
@@ -235,12 +227,7 @@ func (pgmodel *PgDB) GetUserDeliveryCountByHash(result map[string]int, scheduleI
 	}
 
 	fmt.Println("Finded count by hash", result["lenUsers"], count, hash)
-
-	if( result["lenUsers"] == count ) {
-		return count, nil
-	}
-
-	return 0, nil
+	return count, nil
 }
 
 func (pgmodel *PgDB) GetSchedulerById(modelId int) (*model.ScheduleTask, error) {

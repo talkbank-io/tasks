@@ -24,6 +24,13 @@ const (
 	LOG_FILE = "/var/log/tasks/tasks.log"
 )
 
+// Status inquires the status of a job, 0: running, 1: paused, -1: not started.
+var jobStatus = map[int]string{
+	0: "Runned",
+	1: "Paused",
+	-1: "Not runned",
+}
+
 // Parse json config file
 var configFile string
 var amqpString map[string]interface{}
@@ -141,8 +148,10 @@ func StartSchedulersJob() {
 	for _, scheduleItem := range resultSet {
 		scheduleTaskItem := scheduleItem
 
-		// Status inquires the status of a job, 0: running, 1: paused, -1: not started.
-		fmt.Printf("Running jobID: %d, type=%s, and status: %d\n", scheduleTaskItem.Id, scheduleTaskItem.Type, cronJob.w.Status(scheduleTaskItem.Id))
+
+		cronJobStatus := cronJob.w.Status(scheduleTaskItem.Id)
+
+		fmt.Printf("Running jobID: %d, type=%s, and status: %s\n", scheduleTaskItem.Id, scheduleTaskItem.Type, jobStatus[cronJobStatus])
 
 		// если задача не запущена
 		// или не в паузе тогда создаем задачу и запускаем ее
@@ -234,8 +243,6 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 
 		if ( len(result) > 0 ) {
 
-			cronJob.w.RemoveFunc(scheduleTask.Id)
-
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (currentSchedulerTask.Id * 1000), func() {
 					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
@@ -290,6 +297,7 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 	countUsersDelivery, _ := database.GetUserDeliveryCountByHash(result, scheduleId, hash)
 
 	fmt.Printf("Count of users_delivery now: %d, coverage: %d\n", countUsersDelivery, result["lenUsers"])
+
 	if ( countUsersDelivery == result["lenUsers"] ) {
 		finalize := &schedule.FinalizeMessage{
 			CoverageCount:  result["lenUsers"],
@@ -314,6 +322,11 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 
 		defer publisherQueue.Close()
 
+		if( actionType == "recurrently" ) {
+			cronJob.w.RemoveFunc(scheduleId)
+			fmt.Println("Recurrently job was removed after finish work", scheduleId, ", and must be started on nextTick")
+		}
+
 		if ( isPublish == true ) {
 			fmt.Printf(
 				"Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
@@ -330,7 +343,6 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 
 			writer.Flush()
 			cronJob.w.RemoveFunc(scheduleId * 1000)
-
 			database.SetIsRunning(scheduleId, false)
 		}
 	}

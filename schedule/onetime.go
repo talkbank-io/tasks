@@ -49,17 +49,16 @@ func NewOnetime(scheduleModel *model.ScheduleTask, pub *publisher.Publisher, dat
 
 func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cron.Cron) map[string]int {
 
-	lastRun, _ := time.Parse("2006-01-02 15:04:00", schedule.row.LastRun.Format("2006-01-02 15:04:00"))
-	fromDate, _ := time.Parse("2006-01-02 15:04:00", schedule.row.FromDatetime.Format("2006-01-02 15:04:00"))
+	fromDate, _ := time.Parse("2006-01-02 15:04:00", schedule.row.FromDatetime.UTC().Format("2006-01-02 15:04:00"))
 	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 
-	fmt.Printf("Start cronjob with ID=%d, LastRun=%v, FromDateTime=%v, Now=%v\n", schedule.row.Id, lastRun, fromDate, now)
+	fmt.Printf("Start cronjob with ID=%d, FromDateTime=%v, Now=%v\n", schedule.row.Id, fromDate, now)
 
 	var result = make(map[string]int)
 
 	if( schedule.row.IsActive == true ) {
 		fmt.Println("Time is equal like ", (fromDate.Equal(now) || fromDate.Add(time.Minute).Equal(now)))
-		if ( fromDate.Equal(now) || fromDate.Add(time.Minute).Equal(now) ) {
+		if ( fromDate.Equal(now) ) {
 
 			hash, err := schedule.db.SaveHash(schedule.row.Id, schedule.row.Delivery.Id)
 			if ( err != nil ) {
