@@ -212,6 +212,7 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 	fmt.Fprintf(writer, "Length of pending task records: %d", len(pendingTasks))
 
 	if ( len(pendingTasks) > 0 ) {
+
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
 		connection, err := getAmqpConnectionChannel()
 		if ( err != nil  ) {
@@ -219,7 +220,9 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 		}
 		publisherQueue := publisher.NewPublisher(connection)
 		pendingTaskSchedule := schedule.NewPending(pendingTasks, publisherQueue, database)
-		pendingTaskSchedule.Run(publisherConfig)
+		result := pendingTaskSchedule.Run(publisherConfig)
+
+		fmt.Println("Pending task will by passed", result)
 	}
 
 }

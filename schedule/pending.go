@@ -14,6 +14,7 @@ type Pending struct {
 	users []*model.Users
 	pub   *publisher.Publisher
 	db    *pgdb.PgDB
+	Hash string
 }
 
 func NewPending(pendingTasks []model.PendingTask, pub *publisher.Publisher, database *pgdb.PgDB) *Pending {
@@ -24,8 +25,13 @@ func NewPending(pendingTasks []model.PendingTask, pub *publisher.Publisher, data
 	}
 }
 
-func (pending *Pending) Run(publisherConfig map[string]interface{}) {
+func (pending *Pending) Run(publisherConfig map[string]interface{}) map[string]int {
 	fmt.Println("All records pending:", pending.rows[0].ScheduleTask.Id, pending.rows[0].Delivery.Id)
+
+	var result = make(map[string]int)
+
+	countPublishing := 0
+	countUnPublished := 0
 
 	start := time.Now()
 	for _, pendingItem := range pending.rows {
@@ -33,6 +39,8 @@ func (pending *Pending) Run(publisherConfig map[string]interface{}) {
 		if ( err != nil ) {
 			fmt.Println("Error on set hash:", err)
 		}
+
+		pending.Hash = hash
 
 		q_message := &QueueMessage{
 			UserId: pendingItem.UserId,
@@ -53,13 +61,25 @@ func (pending *Pending) Run(publisherConfig map[string]interface{}) {
 
 		if err != nil {
 			fmt.Println("error on publishing:", err)
+			countUnPublished++
 		}
 
+		countPublishing++
 		fmt.Println("Message will be publish:", isPublish)
 	}
+
+	result["countPublishing"] = countPublishing
+	result["countUnPublished"] = countUnPublished
+	result["lenUsers"] = len(pending.rows)
 
 	end := time.Now()
 	difference := end.Sub(start)
 
 	fmt.Printf("Time to resolve task: %v\n", difference)
+
+	return result
+}
+
+func (pending *Pending) GetCurrentHash() string {
+	return pending.Hash
 }
