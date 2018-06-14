@@ -81,6 +81,11 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 				return result
 			}
 
+			if( len(users) < 1 ) {
+				fmt.Println("Users to delivery not found", users)
+				return result
+			}
+
 			countPublishing := 0
 			countUnPublished := 0
 

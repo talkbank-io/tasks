@@ -212,7 +212,6 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 	fmt.Fprintf(writer, "Length of pending task records: %d", len(pendingTasks))
 
 	if ( len(pendingTasks) > 0 ) {
-
 		publisherConfig := amqpString["publisher"].(map[string]interface{})
 		connection, err := getAmqpConnectionChannel()
 		if ( err != nil  ) {
@@ -244,8 +243,11 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 		result := recurrentlyScheduler.Run(publisherConfig, cronJob.w)
 		hash := recurrentlyScheduler.GetCurrentHash()
 
-		if ( len(result) > 0 ) {
+		if( len(result) < 1 && cronJob.w.Status(scheduleTask.Id) == 1 ){
+			cronJob.w.RemoveFunc(scheduleTask.Id)
+		}
 
+		if ( len(result) > 0 ) {
 			go func() {
 				cronJob.w.AddFunc(CRON_EVERY_QUARTER_SECONDS, (currentSchedulerTask.Id * 1000), func() {
 					fmt.Println("Start inner cronjob to check deliveryUsers", scheduleTask.Id)
@@ -278,6 +280,10 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 		onetimeSchedule := schedule.NewOnetime(currentSchedulerTask, publisherQueue, database)
 		result := onetimeSchedule.Run(publisherConfig, cronJob.w)
 		hash := onetimeSchedule.GetCurrentHash()
+
+		if( len(result) < 1 && cronJob.w.Status(scheduleTask.Id) == 1 ){
+			cronJob.w.RemoveFunc(scheduleTask.Id)
+		}
 
 		if ( len(result) > 0 ) {
 			cronJob.w.RemoveFunc(scheduleTask.Id)

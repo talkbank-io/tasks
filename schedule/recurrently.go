@@ -73,6 +73,11 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 				return result
 			}
 
+			if( len(users) < 1 ) {
+				fmt.Println("Users to delivery not found", users)
+				return result
+			}
+
 			countPublishing := 0
 			countUnPublished := 0
 
@@ -104,8 +109,6 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 
 				countPublishing++
 				fmt.Println("Message will be publish:", isPublish)
-
-				//time.Sleep(TIME_SLEEP_PUBLISH * time.Second)
 			}
 
 			result["countPublishing"] = countPublishing
