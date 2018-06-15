@@ -22,6 +22,7 @@ func NewPublisher(conn *amqp.Connection) *Publisher {
 }
 
 func (pub *Publisher) Close() {
+	fmt.Println("Publisher connection was closed")
 	go pub.conn.Close()
 }
 
