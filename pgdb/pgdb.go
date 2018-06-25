@@ -110,7 +110,7 @@ func (pgmodel *PgDB) SaveHash(scheduleId, deliveryId int) (string, error) {
 }
 
 // return PendingTask::where('planned', '<=', Carbon::now('UTC'))->get();
-func (pgmodel *PgDB) SelectPendingTasks() ([]model.PendingTask, error) {
+func (pgmodel *PgDB) SelectPendingTasks(limit int) ([]model.PendingTask, error) {
 	now, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
 
 	scheduleRepository := model.NewScheduleRepository()
@@ -125,6 +125,7 @@ func (pgmodel *PgDB) SelectPendingTasks() ([]model.PendingTask, error) {
 		Join("INNER JOIN talkbank_bots.schedule_task AS schedule_task ON schedule_task.action_id = pending_task.action_id").
 		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
 		Where("pending_task.planned <= ?", now).
+		Limit(limit).
 		Select()
 
 	if err != nil {

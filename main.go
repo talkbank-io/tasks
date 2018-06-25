@@ -105,7 +105,7 @@ func main() {
 	writer = bufio.NewWriter(logFile)
 
 	cronJob.w.AddFunc(CRON_ONETIME_FORMAT, 0, func() {
-		pendings, err := database.SelectPendingTasks()
+		pendings, err := database.SelectPendingTasks(25)
 		if ( err != nil ) {
 			fmt.Fprintf(writer, "Error to get data from PendingTask=%v\n", err)
 			writer.Flush()
