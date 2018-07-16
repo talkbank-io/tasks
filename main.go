@@ -82,6 +82,7 @@ func main() {
 	}
 
 	database = pgdb.NewPgDB(configDB)
+
 	cronJob = &CronJob{
 		w: cron.New(),
 	}

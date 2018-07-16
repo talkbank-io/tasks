@@ -378,6 +378,24 @@ func (pgmodel *PgDB) GetActiveUsers(userIds string, filter []model.Filter) ([]*m
 
 }
 
+func parseStringAsArray(input string) ([]string, error) {
+	array := strings.Split(strings.Trim(input, " "), ",")
+
+	if( len(array) <= 0 ) {
+		return nil, fmt.Errorf("Empty string after split= %s", input)
+	}
+
+	var output []string
+	if( len(array) > 0 ) {
+		for _, item := range array {
+			output = append(output, strings.Trim(item, " "))
+		}
+	}
+
+	return output, nil
+}
+
+
 func parseStringUserIds(users string) ([][]int, bool) {
 
 	var userIds = [][]int{}
@@ -465,6 +483,19 @@ func (pgmodel *PgDB) GetFilterQuery(query *orm.Query, filters []model.Filter) (*
 				if ( value != "" ) {
 					whereString = append(whereString, pathField + " < ?", boolean, value)
 				}
+			case "<=":
+				if( value != "" ) {
+					whereString = append(whereString, pathField + " <= ?", boolean, value)
+				}
+			case ">=":
+				if( value != "" ) {
+					whereString = append(whereString, pathField + " >= ?", boolean, value)
+				}
+			case "in":
+				if( value != "" ) {
+					whereString = append(whereString, pathField + " IN ("+value+")", boolean)
+
+				}
 			case "like":
 				if ( value != "" ) {
 					value = "%" + value + "%"
@@ -488,7 +519,6 @@ func (pgmodel *PgDB) GetFilterQuery(query *orm.Query, filters []model.Filter) (*
 
 	return query, i
 }
-
 
 
 /**
