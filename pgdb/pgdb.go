@@ -493,7 +493,7 @@ func (pgmodel *PgDB) GetFilterQuery(query *orm.Query, filters []model.Filter) (*
 				}
 			case "in":
 				if( value != "" ) {
-					whereString = append(whereString, pathField + " IN ("+value+")", boolean)
+					whereString = append(whereString, pathField + " IN ("+value+")", boolean, value)
 
 				}
 			case "like":
