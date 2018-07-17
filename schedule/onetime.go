@@ -39,6 +39,9 @@ type FinalizeMessage struct {
 	ActionType     string
 }
 
+
+
+
 func NewOnetime(scheduleModel *model.ScheduleTask, pub *publisher.Publisher, database *pgdb.PgDB) *Onetime {
 	return &Onetime{
 		row: scheduleModel,

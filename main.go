@@ -21,7 +21,17 @@ const (
 	CRON_ONETIME_FORMAT = "0 * * * * *" // every minutes
 	CRON_EVERY_QUARTER_SECONDS = "*/15 * * * *" // every 15 seconds
 	LOG_FILE = "/var/log/tasks/tasks.log"
+	NOTIFY_QUEUE = "messengers.notify"
+	NOTIFY_GROUP = "error"
+	BOT_URL = "https://bot.talkbank.io/admin/massAction/%d/edit"
 )
+
+type AlarmMessage struct {
+	Text string
+	Group string
+}
+
+
 
 // Status inquires the status of a job, 0: running, 1: paused, -1: not started.
 var jobStatus = map[int]string{
@@ -145,6 +155,13 @@ func StartSchedulersJob() {
 		scheduleTaskItem := scheduleItem
 		cronJobStatus := cronJob.w.Status(scheduleTaskItem.Id)
 
+		currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
+		nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
+
+		if ( cronJobStatus == 0 && nextRunDate.Before(currentTime) ) {
+			notifyAlarm(scheduleTaskItem)
+		}
+
 		fmt.Printf("Running jobID: %d, actionID=%d, type=%s, and status: %s\n", scheduleTaskItem.Id, scheduleTaskItem.ActionId, scheduleTaskItem.Type, jobStatus[cronJobStatus])
 
 		// если задача не запущена
@@ -156,9 +173,6 @@ func StartSchedulersJob() {
 				})
 
 			} else {
-
-				currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
-				nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
 
 				if ( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
 					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
@@ -220,7 +234,7 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 	now, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
 
 	if ( currentSchedulerTask.IsActive == true ) {
-		if( nextRun.Equal(now) ) {
+		if ( nextRun.Equal(now) ) {
 			connection, err := getAmqpConnectionChannel()
 			if ( err != nil  ) {
 				fmt.Errorf("Channel connection is closed: %v", err)
@@ -234,7 +248,7 @@ func runRecurrently(scheduleTask model.ScheduleTask) {
 
 			hash := recurrentlyScheduler.GetCurrentHash()
 
-			if( len(result) < 1 && cronJob.w.Status(scheduleTask.Id) == 1 ){
+			if ( len(result) < 1 && cronJob.w.Status(scheduleTask.Id) == 1 ) {
 				cronJob.w.RemoveFunc(scheduleTask.Id)
 			}
 
@@ -268,7 +282,7 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 	now, _ := time.Parse("2006-01-02 15:04:00", time.Now().UTC().Format("2006-01-02 15:04:00"))
 
 	if ( currentSchedulerTask.IsActive == true ) {
-		if( fromDate.Equal(now) ) {
+		if ( fromDate.Equal(now) ) {
 			connection, err := getAmqpConnectionChannel()
 			if ( err != nil  ) {
 				fmt.Errorf("Channel connection is closed: %v", err)
@@ -282,7 +296,7 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 
 			hash := onetimeSchedule.GetCurrentHash()
 
-			if( len(result) < 1 && cronJob.w.Status(scheduleTask.Id) == 1 ){
+			if ( len(result) < 1 && cronJob.w.Status(scheduleTask.Id) == 1 ) {
 				cronJob.w.RemoveFunc(scheduleTask.Id)
 			}
 
@@ -301,6 +315,34 @@ func runOnetime(scheduleTask model.ScheduleTask) {
 		cronJob.w.RemoveFunc(currentSchedulerTask.Id)
 	}
 
+}
+
+func notifyAlarm(scheduleTask model.ScheduleTask) {
+	newMessage := []AlarmMessage{
+		AlarmMessage{
+			Text: fmt.Sprintf("MassAction: %d was delayed, and it must be restarted to continue work. %s",
+				scheduleTask.ActionId, fmt.Sprintf(BOT_URL, scheduleTask.ActionId)),
+			Group: NOTIFY_GROUP,
+		},
+	}
+
+	cronJob.w.RemoveFunc(scheduleTask.Id)
+	alarm_message, err := json.Marshal(newMessage)
+	fmt.Println("Message to publich on alarm:", alarm_message)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+
+	connection, _ := getAmqpConnectionChannel()
+	publisherQueue := publisher.NewPublisher(connection)
+
+	_, err = publisherQueue.Publish(NOTIFY_QUEUE, alarm_message)
+
+	if err != nil {
+		fmt.Println("error on publishing:", err)
+	}
+
+	defer publisherQueue.Close()
 }
 
 func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[string]int, scheduleId int, actionType, hash string) {
@@ -336,7 +378,7 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 
 		if ( isPublish == true ) {
 
-			if( actionType == "recurrently" ) {
+			if ( actionType == "recurrently" ) {
 				cronJob.w.RemoveFunc(scheduleId)
 				fmt.Println("Recurrently job was removed after finish work", scheduleId, ", and must be started on nextTick")
 			}
