@@ -158,15 +158,14 @@ func StartSchedulersJob() {
 		currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
 		nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
 
+		fmt.Printf("Running jobID: %d, actionID=%d, type=%s, and status: %s\n", scheduleTaskItem.Id, scheduleTaskItem.ActionId, scheduleTaskItem.Type, jobStatus[cronJobStatus])
 		if ( cronJobStatus == 0 && nextRunDate.Before(currentTime) ) {
 			notifyAlarm(scheduleTaskItem)
 		}
 
-		fmt.Printf("Running jobID: %d, actionID=%d, type=%s, and status: %s\n", scheduleTaskItem.Id, scheduleTaskItem.ActionId, scheduleTaskItem.Type, jobStatus[cronJobStatus])
-
 		// если задача не запущена
 		// или не в паузе тогда создаем задачу и запускаем ее
-		if ( cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1 ) {
+		if ( (cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1) && nextRunDate.After(currentTime) ) {
 			if ( scheduleTaskItem.Type == "onetime" ) {
 				cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
 					go runOnetime(scheduleTaskItem)
