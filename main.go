@@ -164,7 +164,7 @@ func StartSchedulersJob() {
 		}else{
 			// если задача не запущена
 			// или не в паузе тогда создаем задачу и запускаем ее
-			if ( (cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1) ) {
+			if ( (cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1) && nextRunDate.After(currentTime) ) {
 				if ( scheduleTaskItem.Type == "onetime" ) {
 					cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
 						go runOnetime(scheduleTaskItem)
