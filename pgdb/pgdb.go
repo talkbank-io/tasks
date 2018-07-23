@@ -434,7 +434,8 @@ func (pgmodel *PgDB) GetFilterQuery(query *orm.Query, filters []model.Filter) (*
 			path := pathRegex.ReplaceAllString(filter.Path, "")
 
 			valueRegex := regexp.MustCompile("([+-]?)(\\d+) (months|days)")
-			value := strings.ToLower(filter.Value)
+			//value := strings.ToLower(filter.Value)
+			value := filter.Value
 			match := valueRegex.FindStringSubmatch(value)
 
 			if ( len(match) > 0 ) {

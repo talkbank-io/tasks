@@ -159,41 +159,41 @@ func StartSchedulersJob() {
 		nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
 
 		fmt.Printf("Running jobID: %d, actionID=%d, type=%s, and status: %s\n", scheduleTaskItem.Id, scheduleTaskItem.ActionId, scheduleTaskItem.Type, jobStatus[cronJobStatus])
-		if ( cronJobStatus == 0 && nextRunDate.Before(currentTime) ) {
+		if ( nextRunDate.Before(currentTime) ) {
 			notifyAlarm(scheduleTaskItem)
-		}
+		}else{
+			// если задача не запущена
+			// или не в паузе тогда создаем задачу и запускаем ее
+			if ( (cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1) ) {
+				if ( scheduleTaskItem.Type == "onetime" ) {
+					cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
+						go runOnetime(scheduleTaskItem)
+					})
 
-		// если задача не запущена
-		// или не в паузе тогда создаем задачу и запускаем ее
-		if ( (cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1) && nextRunDate.After(currentTime) ) {
-			if ( scheduleTaskItem.Type == "onetime" ) {
-				cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
-					go runOnetime(scheduleTaskItem)
-				})
+				} else {
 
-			} else {
+					if ( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
+						entry := cronJob.w.EntryById(scheduleTaskItem.Id)
 
-				if ( cronJob.w.Status(scheduleTaskItem.Id) == 0 ) {
-					entry := cronJob.w.EntryById(scheduleTaskItem.Id)
+						fmt.Printf(
+							"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v, is Equal nextrun=%v\n",
+							time.Now().UTC(),
+							scheduleTaskItem.NextRun.UTC(),
+							entry.Next.UTC(),
+							nextRunDate.Equal(currentTime))
+					}
 
-					fmt.Printf(
-						"Recurrently job must be started at: currentTime=%v, nextRun=%v, nextRunJob=%v, is Equal nextrun=%v\n",
-						time.Now().UTC(),
-						scheduleTaskItem.NextRun.UTC(),
-						entry.Next.UTC(),
-						nextRunDate.Equal(currentTime))
+
+
+					// если при запуске задачника мы находим recurrenllty задачу
+					// и понимаем что ее надо зупускать, потому что она не была запущена
+					// то мы ее запускаем
+					// иначе смотрим если дата следующего запуска больше текущей даты
+					// тогда запускаем задачник по расписанию в шаблоне
+					cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
+						go runRecurrently(scheduleTaskItem)
+					})
 				}
-
-
-
-				// если при запуске задачника мы находим recurrenllty задачу
-				// и понимаем что ее надо зупускать, потому что она не была запущена
-				// то мы ее запускаем
-				// иначе смотрим если дата следующего запуска больше текущей даты
-				// тогда запускаем задачник по расписанию в шаблоне
-				cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
-					go runRecurrently(scheduleTaskItem)
-				})
 			}
 		}
 	}
@@ -325,7 +325,6 @@ func notifyAlarm(scheduleTask model.ScheduleTask) {
 		},
 	}
 
-	cronJob.w.RemoveFunc(scheduleTask.Id)
 	alarm_message, err := json.Marshal(newMessage)
 	fmt.Println("Message to publich on alarm:", alarm_message)
 	if err != nil {
