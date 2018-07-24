@@ -159,7 +159,7 @@ func StartSchedulersJob() {
 		nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
 
 		fmt.Printf("Running jobID: %d, actionID=%d, type=%s, and status: %s\n", scheduleTaskItem.Id, scheduleTaskItem.ActionId, scheduleTaskItem.Type, jobStatus[cronJobStatus])
-		if ( nextRunDate.Before(currentTime) ) {
+		if ( nextRunDate.Before(currentTime) && scheduleTaskItem.IsRunning == false ) {
 			notifyAlarm(scheduleTaskItem)
 		}else{
 			// если задача не запущена
