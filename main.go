@@ -158,8 +158,9 @@ func StartSchedulersJob() {
 		currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
 		nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
 
+		// Status inquires the status of a job, 0: running, 1: paused, -1: not started.
 		fmt.Printf("Running jobID: %d, actionID=%d, type=%s, and status: %s\n", scheduleTaskItem.Id, scheduleTaskItem.ActionId, scheduleTaskItem.Type, jobStatus[cronJobStatus])
-		if ( nextRunDate.Before(currentTime) && scheduleTaskItem.IsRunning == false ) {
+		if ( nextRunDate.Before(currentTime) && scheduleTaskItem.IsRunning == false && (cronJob.w.Status(scheduleTaskItem.Id) == 0)) {
 			notifyAlarm(scheduleTaskItem)
 		}else{
 			// если задача не запущена

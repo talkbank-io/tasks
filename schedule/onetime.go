@@ -123,7 +123,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 				}
 
 				countPublishing++
-				fmt.Println("Message will be publish:", isPublish, time.Now().Sub(begin))
+				fmt.Println("Message will be publish, and now on:", isPublish, countPublishing, time.Now().Sub(begin))
 			}
 
 			result["countPublishing"] = countPublishing
