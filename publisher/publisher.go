@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"github.com/streadway/amqp"
+
 )
 
 type Publisher struct {

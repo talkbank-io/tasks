@@ -8,6 +8,11 @@ import (
 	"github.com/killer-djon/tasks/publisher"
 	"github.com/killer-djon/tasks/pgdb"
 	"github.com/killer-djon/cron"
+	rate "github.com/beefsack/go-rate"
+)
+
+const (
+	RATE_LIMIT = 3
 )
 
 type Recurrently struct {
@@ -73,7 +78,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 				return result
 			}
 
-			if( len(users) < 1 ) {
+			if ( len(users) < 1 ) {
 				fmt.Println("Users to delivery not found", users)
 				return result
 			}
@@ -81,7 +86,10 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 			countPublishing := 0
 			countUnPublished := 0
 
+			rl := rate.New(RATE_LIMIT, time.Second)
+			begin := time.Now()
 			for _, user := range users {
+				rl.Wait()
 				q_message := &QueueMessage{
 					UserId: user.Id,
 					TaskId: schedule.row.Id,
@@ -108,7 +116,9 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 				}
 
 				countPublishing++
-				fmt.Println("Message will be publish:", isPublish)
+				fmt.Println("Message will be publish:", isPublish, time.Now().Sub(begin))
+
+
 			}
 
 			result["countPublishing"] = countPublishing

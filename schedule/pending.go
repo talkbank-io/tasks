@@ -7,7 +7,9 @@ import (
 	"github.com/killer-djon/tasks/model"
 	"github.com/killer-djon/tasks/publisher"
 	"github.com/killer-djon/tasks/pgdb"
+	rate "github.com/beefsack/go-rate"
 )
+
 
 type Pending struct {
 	rows  []model.PendingTask
@@ -33,8 +35,11 @@ func (pending *Pending) Run(publisherConfig map[string]interface{}) map[string]i
 	countPublishing := 0
 	countUnPublished := 0
 
+	rl := rate.New(RATE_LIMIT, time.Second)
+	begin := time.Now()
 	start := time.Now()
 	for _, pendingItem := range pending.rows {
+		rl.Wait()
 		hash, err := pending.db.SaveHash(pendingItem.ScheduleTask.Id, pendingItem.Delivery.Id)
 		if ( err != nil ) {
 			fmt.Println("Error on set hash:", err)
@@ -65,7 +70,7 @@ func (pending *Pending) Run(publisherConfig map[string]interface{}) map[string]i
 		}
 
 		countPublishing++
-		fmt.Println("Message will be publish:", isPublish)
+		fmt.Println("Message will be publish:", isPublish, time.Now().Sub(begin))
 	}
 
 	result["countPublishing"] = countPublishing
