@@ -8,6 +8,7 @@ import (
 	"github.com/killer-djon/tasks/publisher"
 	"github.com/killer-djon/tasks/pgdb"
 	"github.com/killer-djon/cron"
+	rate "github.com/beefsack/go-rate"
 )
 
 const (
@@ -51,7 +52,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 
 	if ( schedule.row.IsActive == true ) {
 		if ( nextRun.Equal(now) ) {
-			fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
+			fmt.Println("Cron job must be paused for work correctly", schedule.row.Id, schedule.row.Delivery.Id)
 			cronJob.PauseFunc(schedule.row.Id)
 
 			// Если время следующего запуска совпадает с текущим временем
@@ -60,7 +61,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 			// но при этом надо проверить если nextRun был послденим то мы удаляем job
 			hash, err := schedule.db.SaveHash(schedule.row.Id, schedule.row.Delivery.Id)
 			if ( err != nil ) {
-				fmt.Println("Error on save hash to massAction:", err, schedule.row.Id)
+				fmt.Println("Error on save hash to massAction:", err, schedule.row.Id, schedule.row.Delivery.Id)
 				cronJob.RemoveFunc(schedule.row.Id)
 				return result
 			}
@@ -74,18 +75,23 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 
 			if ( err != nil ) {
 				fmt.Println("Error to get users by params", err)
+				schedule.db.SetIsRunning(schedule.row.Id, false)
 				return result
 			}
 
 			if ( len(users) < 1 ) {
 				fmt.Println("Users to delivery not found", users)
+				schedule.db.SetIsRunning(schedule.row.Id, false)
 				return result
 			}
 
 			countPublishing := 0
 			countUnPublished := 0
 
+			rl := rate.New(RATE_LIMIT, time.Second * 2)
+			begin := time.Now()
 			for _, user := range users {
+				rl.Wait()
 				q_message := &QueueMessage{
 					UserId: user.Id,
 					TaskId: schedule.row.Id,
@@ -95,7 +101,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 					Hash: hash,
 				}
 
-				fmt.Println("Will be publis data of the recurrently:", q_message)
+				fmt.Println("Will be publish data of the recurrently:", schedule.row.Delivery.Id, q_message)
 
 				message, err := json.Marshal(q_message)
 				if err != nil {
@@ -112,7 +118,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 				}
 
 				countPublishing++
-				fmt.Println("Message will be publish, and now on:", isPublish, countPublishing)
+				fmt.Println("Message will be publish, and now on:", schedule.row.Delivery.Id, isPublish, countPublishing, time.Now().Sub(begin))
 
 
 			}
@@ -124,7 +130,7 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 			end := time.Now()
 			difference := end.Sub(start)
 
-			fmt.Printf("Time to resolve task: %v\n", difference)
+			fmt.Printf("Time to resolve task=%d: %v\n", schedule.row.Delivery.Id, difference)
 		}
 	} else {
 		cronJob.RemoveFunc(schedule.row.Id)

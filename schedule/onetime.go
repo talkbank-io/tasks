@@ -8,6 +8,7 @@ import (
 	"github.com/killer-djon/tasks/publisher"
 	"github.com/killer-djon/tasks/pgdb"
 	"github.com/killer-djon/cron"
+	rate "github.com/beefsack/go-rate"
 )
 
 const (
@@ -74,25 +75,30 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 			schedule.db.SetIsRunning(schedule.row.Id, true)
 
 			start := time.Now()
-			fmt.Println("Cron job must be paused for work correctly", schedule.row.Id)
+			fmt.Println("Cron job must be paused for work correctly", schedule.row.Delivery.Id, schedule.row.Id)
 			cronJob.PauseFunc(schedule.row.Id)
 
 			users, err := schedule.db.GetActiveUsers(schedule.row.Delivery.UserIds, schedule.row.Delivery.Filter)
 
 			if ( err != nil ) {
-				fmt.Println("Error to get users by params", err)
+				fmt.Println("Error to get users by params", schedule.row.Delivery.Id, err)
+				schedule.db.SetIsRunning(schedule.row.Id, false)
 				return result
 			}
 
 			if( len(users) < 1 ) {
-				fmt.Println("Users to delivery not found", users)
+				fmt.Println("Users to delivery not found", schedule.row.Delivery.Id, users)
+				schedule.db.SetIsRunning(schedule.row.Id, false)
 				return result
 			}
 
 			countPublishing := 0
 			countUnPublished := 0
 
+			rl := rate.New(RATE_LIMIT, time.Second)
+			begin := time.Now()
 			for _, user := range users {
+				rl.Wait()
 				q_message := &QueueMessage{
 					UserId: user.Id,
 					TaskId: schedule.row.Id,
@@ -102,7 +108,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 					Hash: hash,
 				}
 
-				fmt.Println("Will be publis data:", q_message)
+				fmt.Println("Will be publis data:", schedule.row.Delivery.Id, q_message)
 
 				message, err := json.Marshal(q_message)
 				if err != nil {
@@ -119,7 +125,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 				}
 
 				countPublishing++
-				fmt.Println("Message will be publish, and now on:", isPublish, countPublishing)
+				fmt.Println("Message will be publish, and now on:", schedule.row.Delivery.Id, isPublish, countPublishing, time.Now().Sub(begin))
 			}
 
 			result["countPublishing"] = countPublishing
@@ -129,7 +135,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 			end := time.Now()
 			difference := end.Sub(start)
 
-			fmt.Printf("Time to resolve task: %v\n", difference)
+			fmt.Printf("Time to resolve task=%d: %v\n", schedule.row.Delivery.Id, difference)
 		}
 	}else{
 		cronJob.RemoveFunc(schedule.row.Id)
