@@ -8,7 +8,6 @@ import (
 	"github.com/killer-djon/tasks/publisher"
 	"github.com/killer-djon/tasks/pgdb"
 	"github.com/killer-djon/cron"
-	rate "github.com/beefsack/go-rate"
 )
 
 const (
@@ -95,10 +94,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 			countPublishing := 0
 			countUnPublished := 0
 
-			rl := rate.New(RATE_LIMIT, time.Second)
-			begin := time.Now()
 			for _, user := range users {
-				rl.Wait()
 				q_message := &QueueMessage{
 					UserId: user.Id,
 					TaskId: schedule.row.Id,
@@ -125,7 +121,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 				}
 
 				countPublishing++
-				fmt.Println("Message will be publish, and now on:", schedule.row.Delivery.Id, isPublish, countPublishing, time.Now().Sub(begin))
+				fmt.Println("Message will be publish, and now on:", schedule.row.Delivery.Id, isPublish, countPublishing)
 			}
 
 			result["countPublishing"] = countPublishing
