@@ -17,9 +17,9 @@
     },
     "threads": 8,
     "publisher": {
-        "queue_pending": "core.massaction.pending",
-        "queue_onetime": "core.massaction.onetime",
-        "queue_recurrently": "core.massaction.recurrently",
-        "queue_statistic": "core.massaction.statistic"
+        "queue_pending": "massaction.pending",
+        "queue_onetime": "massaction.onetime",
+        "queue_recurrently": "massaction.recurrently",
+        "queue_statistic": "massaction.statistic"
     }
 }

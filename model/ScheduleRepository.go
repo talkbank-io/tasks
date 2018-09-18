@@ -12,7 +12,7 @@ type Filter struct {
 }
 
 type PendingTask struct {
-	tableName    struct{} `sql:"talkbank_bots.pending_task"`
+	TableName    struct{} `sql:"talkbank_bots.pending_task"`
 	Id           int `sql:"id"`
 	ActionId     int
 	UserId       int
@@ -23,20 +23,20 @@ type PendingTask struct {
 
 // DB Model for table schedule_task
 type ScheduleTask struct {
-	tableName    struct{} `sql:"talkbank_bots.schedule_task"`
+	TableName    struct{} `sql:"talkbank_bots.schedule_task"`
 	Id           int `sql:"id"`
 	ActionId     int
 	Type         string `sql:"type:talkbank_bots.SCHEDULE_TASK_TYPE"`
 	Category     string
 	Template     string
-	FromDatetime time.Time
-	ToDatetime   time.Time
+	FromDatetime time.Time `sql:",notnull"`
+	ToDatetime   time.Time `sql:",notnull"`
 	IsActive     bool
 	CreatedAt    time.Time `sql:"default:now()"`
 	UpdatedAt    time.Time
 	NextDatetime time.Time
 	LastRun      time.Time
-	NextRun      time.Time
+	NextRun      time.Time `sql:",notnull"`
 	StartTz      string
 	Delivery     *Delivery
 	IsRunning    bool
@@ -44,12 +44,12 @@ type ScheduleTask struct {
 
 // DB Model for table delivery
 type Delivery struct {
-	tableName           struct{} `sql:"talkbank_bots.delivery"`
+	TableName           struct{} `sql:"talkbank_bots.delivery"`
 	Id                  int `sql:"id"`
-	Text                string
-	Title               string
-	Description         string
-	TagId               int
+	Text                string `sql:",notnull"`
+	Title               string `sql:",notnull"`
+	Description         string `sql:",notnull"`
+	TagId               int `sql:",notnull"`
 	CountUsers          int `sql:"countUsers"`
 	Sent                int
 	LastSending         time.Time `sql:"lastSending"`
@@ -58,14 +58,13 @@ type Delivery struct {
 	ParametersCondition string `sql:"parametersCondition"`
 	CreatedAt           time.Time `sql:"default:now()"`
 	UpdatedAt           time.Time
-	DeletedAt           time.Time
 	UserIds             string
 	Filter              []Filter
 	ActionHash          string
 }
 
 type UserDelivery struct {
-	tableName    struct{} `sql:"talkbank_bots.user_delivery"`
+	TableName    struct{} `sql:"talkbank_bots.user_delivery"`
 	Id           int `sql:"id"`
 	UserId       int
 	DeliveryId   int

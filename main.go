@@ -13,6 +13,7 @@ import (
 	"github.com/killer-djon/tasks/pgdb"
 	"github.com/killer-djon/tasks/schedule"
 	"github.com/killer-djon/tasks/publisher"
+
 	"os"
 	"time"
 )
@@ -351,54 +352,32 @@ func checkDeliveredUsers(publisherConfig map[string]interface{}, result map[stri
 	fmt.Printf("Count of users_delivery now: %d, coverage: %d\n", countUsersDelivery, result["lenUsers"])
 
 	if ( countUsersDelivery == result["lenUsers"] ) {
-		finalize := &schedule.FinalizeMessage{
-			CoverageCount:  result["lenUsers"],
-			PublishCount: result["countPublishing"],
-			UnpublishCount: result["lenUsers"] - result["countPublishing"],
-			ScheduleId: scheduleId,
-			ActionType: actionType,
+
+		database.SaveStatistic(scheduleId, countUsersDelivery);
+
+		if ( actionType == "recurrently" ) {
+			// @TODO we must write statistic information by this schedule
+			// and write next runtime of this schedule
+			cronJob.w.RemoveFunc(scheduleId)
+			fmt.Println("Recurrently job was removed after finish work", scheduleId, ", and must be started on nextTick")
 		}
 
-		finalize_message, err := json.Marshal(finalize)
-		if err != nil {
-			fmt.Println("error:", err)
-		}
+		fmt.Printf(
+			"Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
+			scheduleId,
+			result["lenUsers"],
+			result["countPublishing"],
+			result["countUnPublished"])
 
-		connection, _ := getAmqpConnectionChannel()
-		publisherQueue := publisher.NewPublisher(connection)
+		fmt.Fprintf(writer, "Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
+			scheduleId,
+			result["lenUsers"],
+			result["countPublishing"],
+			result["countUnPublished"])
 
-		isPublish, err := publisherQueue.Publish(publisherConfig["queue_statistic"].(string), finalize_message)
-
-		if err != nil {
-			fmt.Println("error on publishing:", err)
-		}
-
-		defer publisherQueue.Close()
-
-		if ( isPublish == true ) {
-
-			if ( actionType == "recurrently" ) {
-				cronJob.w.RemoveFunc(scheduleId)
-				fmt.Println("Recurrently job was removed after finish work", scheduleId, ", and must be started on nextTick")
-			}
-
-			fmt.Printf(
-				"Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
-				scheduleId,
-				result["lenUsers"],
-				result["countPublishing"],
-				result["countUnPublished"])
-
-			fmt.Fprintf(writer, "Cron job with ID=%d will be running succefull, Coverage count=%d, published count=%d, unPublished count=%d\n",
-				scheduleId,
-				result["lenUsers"],
-				result["countPublishing"],
-				result["countUnPublished"])
-
-			writer.Flush()
-			cronJob.w.RemoveFunc(scheduleId * 1000)
-			database.SetIsRunning(scheduleId, false)
-		}
+		writer.Flush()
+		cronJob.w.RemoveFunc(scheduleId * 1000)
+		database.SetIsRunning(scheduleId, false)
 	}
 }
 

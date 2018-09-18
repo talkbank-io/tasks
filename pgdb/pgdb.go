@@ -9,14 +9,20 @@ import (
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
 	"github.com/killer-djon/tasks/model"
+	"github.com/gorhill/cronexpr"
 	"strings"
 	"regexp"
 	"strconv"
 	"sort"
 
+	"math/rand"
+	"encoding/json"
 )
 
-const TIME_FORMAT = "2006-01-02"
+const (
+	TIME_FORMAT = "2006-01-02"
+	letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+)
 
 var ScheduleRow []struct {
 	Id       int64
@@ -59,7 +65,6 @@ func (pgmodel *PgDB) logSqlEvent() {
 
 func (pgmodel *PgDB) SetHashAction(Id int, hash string) (string, error) {
 
-	//res, err := pgmodel.db.Model(model.Delivery).Set("action_hash = ?title").Where("id = ?id").Update()
 	var hashString string
 	_, err := pgmodel.db.Model(&model.Delivery{}).
 		Set("action_hash = ?", hash).
@@ -87,11 +92,138 @@ func (pgmodel *PgDB) SetIsRunning(Id int, isRunning bool) {
 	}
 }
 
+func (pgmodel *PgDB) SaveStatistic(scheduleId, countUsersDelivery int) {
+	scheduleItem, err := pgmodel.GetSchedulerById(scheduleId)
+
+	if ( err != nil ) {
+		fmt.Println("Cant find schedule by Id", scheduleId)
+	}
+
+	now := time.Now().UTC()
+
+	is_active := true
+	last_run := now
+	is_running := false
+
+	if ( scheduleItem.Type == "onetime" ) {
+		is_active = false
+
+		_, err = pgmodel.db.Model(scheduleItem).
+			Set("last_run = ?", last_run).
+			Set("is_active = ?", is_active).
+			Set("is_running = ?", is_running).
+			WherePK().
+			Update()
+	}else {
+		var resultTemplate = make(map[string]string)
+		json.Unmarshal([]byte(scheduleItem.Template), &resultTemplate)
+
+		cronTemplate := fmt.Sprintf("%s %s %s %s %s",
+			resultTemplate["minute"],
+			resultTemplate["hour"],
+			resultTemplate["day"],
+			resultTemplate["month"],
+			resultTemplate["weekday"],
+		)
+
+
+		// Fields to by  update on schedule item
+		nextRun := cronexpr.MustParse(cronTemplate)
+
+		referenceDateFrom := now
+		if( scheduleItem.FromDatetime.After(now) ) {
+			referenceDateFrom = scheduleItem.FromDatetime
+		}
+
+		next_run := nextRun.Next(referenceDateFrom)
+
+		if ( next_run.After(scheduleItem.ToDatetime) ) {
+			is_active = true
+		}else{
+			is_active = false
+		}
+
+		fmt.Printf("Next run time is=%v, by schedule Id=%d", next_run, scheduleItem.Delivery.Id)
+
+		_, err = pgmodel.db.Model(scheduleItem).
+			Set("last_run = ?", last_run).
+			Set("is_active = ?", is_active).
+			Set("is_running = ?", is_running).
+			Set("next_run = ?", next_run).
+			WherePK().
+			Update()
+	}
+
+	if (err != nil) {
+		fmt.Println("ERror on update item", scheduleId, err)
+	}
+
+	delivery, _ := pgmodel.GetDeliveryById(scheduleItem.Delivery.Id)
+
+	delivery.CountUsers = countUsersDelivery
+	delivery.LastSending = last_run
+	delivery.Sent += countUsersDelivery
+
+	_, err = pgmodel.db.Model(delivery).
+		WherePK().
+		Update()
+
+	if (err != nil) {
+		fmt.Println("ERror on update item", scheduleId, err)
+	}
+}
+
+func (pgmodel *PgDB) GetDeliveryById(deliveryId int) (*model.Delivery, error) {
+	deliveryModel := &model.Delivery{Id: deliveryId}
+
+	err := pgmodel.db.Select(deliveryModel)
+
+	if err != nil {
+		fmt.Println("Error to get data from scheduler_task", err)
+		return nil, err
+	}
+
+	return deliveryModel, nil
+}
+
+func (pgmodel *PgDB) GetSchedulerById(modelId int) (*model.ScheduleTask, error) {
+	scheduleModel := &model.ScheduleTask{Id: modelId}
+	err := pgmodel.db.Model(scheduleModel).
+		ColumnExpr("schedule_task.*").
+		ColumnExpr("delivery.title AS delivery__title").
+		ColumnExpr("delivery.text AS delivery__text").
+		ColumnExpr("delivery.user_ids AS delivery__user_ids").
+		ColumnExpr("delivery.id AS delivery__id").
+		ColumnExpr("delivery.filter AS delivery__filter").
+		ColumnExpr("delivery.action_hash AS delivery__action_hash").
+		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
+		Where("schedule_task.id = ?", modelId).
+		Select()
+
+	if err != nil {
+		fmt.Println("Error to get data from scheduler_task", err)
+		return nil, err
+	}
+
+	return scheduleModel, nil
+}
+
+
+// Random unique string letters by n-bytes
+func (pgmodel *PgDB) RandStringBytesRmndr(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Int63() % int64(len(letterBytes))]
+	}
+	return string(b)
+}
+
 func (pgmodel *PgDB) SaveHash(scheduleId, deliveryId int) (string, error) {
 
 	hash := sha256.New()
 	hash.Write([]byte(time.Now().UTC().Format("2006-01-02 15:04:05")))
 	hash.Write([]byte(strconv.Itoa(scheduleId)))
+	hash.Write([]byte(pgmodel.RandStringBytesRmndr(16)))
 	hash.Write([]byte(strconv.Itoa(deliveryId)))
 
 	sum := hash.Sum(nil)
@@ -230,28 +362,6 @@ func (pgmodel *PgDB) GetUserDeliveryCountByHash(result map[string]int, scheduleI
 	return count, nil
 }
 
-func (pgmodel *PgDB) GetSchedulerById(modelId int) (*model.ScheduleTask, error) {
-	scheduleModel := &model.ScheduleTask{Id: modelId}
-	err := pgmodel.db.Model(scheduleModel).
-		ColumnExpr("schedule_task.*").
-		ColumnExpr("delivery.title AS delivery__title").
-		ColumnExpr("delivery.text AS delivery__text").
-		ColumnExpr("delivery.user_ids AS delivery__user_ids").
-		ColumnExpr("delivery.id AS delivery__id").
-		ColumnExpr("delivery.filter AS delivery__filter").
-		ColumnExpr("delivery.action_hash AS delivery__action_hash").
-		Join("INNER JOIN talkbank_bots.delivery AS delivery ON delivery.id = schedule_task.action_id").
-		Where("schedule_task.id = ?", modelId).
-		Select()
-
-	if err != nil {
-		fmt.Println("Error to get data from scheduler_task", err)
-		return nil, err
-	}
-
-	return scheduleModel, nil
-}
-
 // Get users by params
 func (pgmodel *PgDB) GetUsersByFilter(userIds string) ([]*model.Users, error) {
 	userRepository := model.NewUserRepository()
@@ -317,7 +427,8 @@ func (pgmodel *PgDB) GetActiveUsers(userIds string, filter []model.Filter) ([]*m
 		ColumnExpr("distinct(users.id)").
 		Column("users.*").
 		Join("INNER JOIN talkbank_bots.messenger_users AS messenger_users ON messenger_users.user_id = users.id").
-		Where("messenger_users.is_active = ?", true)
+		Where("messenger_users.is_active = ?", true).
+		Where("messenger_users.is_main = ?", true)
 
 	if( userIds != "" ){
 		users, ok := parseStringUserIds(userIds)
