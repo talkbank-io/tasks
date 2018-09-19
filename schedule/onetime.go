@@ -31,6 +31,16 @@ type QueueMessage struct {
 	Hash         string
 }
 
+type PendingMessage struct {
+	UserId       int
+	TaskId       int
+	MassActionId int
+	Text         string
+	Coverage     int
+	Hash         string
+	PendingId    int
+}
+
 type FinalizeMessage struct {
 	CoverageCount  int
 	PublishCount   int
@@ -38,9 +48,6 @@ type FinalizeMessage struct {
 	ScheduleId     int
 	ActionType     string
 }
-
-
-
 
 func NewOnetime(scheduleModel *model.ScheduleTask, pub *publisher.Publisher, database *pgdb.PgDB) *Onetime {
 	return &Onetime{
@@ -59,7 +66,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 
 	var result = make(map[string]int)
 
-	if( schedule.row.IsActive == true ) {
+	if ( schedule.row.IsActive == true ) {
 		fmt.Println("Time is equal like ", (fromDate.Equal(now) || fromDate.Add(time.Minute).Equal(now)))
 		if ( fromDate.Equal(now) ) {
 
@@ -85,7 +92,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 				return result
 			}
 
-			if( len(users) < 1 ) {
+			if ( len(users) < 1 ) {
 				fmt.Println("Users to delivery not found", schedule.row.Delivery.Id, users)
 				schedule.db.SetIsRunning(schedule.row.Id, false)
 				return result
@@ -133,7 +140,7 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 
 			fmt.Printf("Time to resolve task=%d: %v\n", schedule.row.Delivery.Id, difference)
 		}
-	}else{
+	} else {
 		cronJob.RemoveFunc(schedule.row.Id)
 	}
 

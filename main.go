@@ -217,6 +217,7 @@ func runPendingTask(pendingTasks []model.PendingTask) {
 		result := pendingTaskSchedule.Run(publisherConfig)
 
 		defer publisherQueue.Close()
+
 		fmt.Println("Pending task will by passed", result)
 	}
 

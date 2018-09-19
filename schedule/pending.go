@@ -43,13 +43,14 @@ func (pending *Pending) Run(publisherConfig map[string]interface{}) map[string]i
 
 		pending.Hash = hash
 
-		q_message := &QueueMessage{
+		q_message := &PendingMessage{
 			UserId: pendingItem.UserId,
 			TaskId: pendingItem.ScheduleTask.Id,
 			MassActionId: pendingItem.Delivery.Id,
 			Text: pendingItem.Delivery.Text,
 			Coverage: len(pending.rows),
 			Hash: hash,
+			PendingId: pendingItem.Id,
 		}
 
 		message, err := json.Marshal(q_message)
@@ -65,6 +66,8 @@ func (pending *Pending) Run(publisherConfig map[string]interface{}) map[string]i
 			fmt.Println("error on publishing:", err)
 			countUnPublished++
 		}
+
+		pending.db.IncSentDelivery(pendingItem, pendingItem.Delivery.Id, 1)
 
 		countPublishing++
 		fmt.Println("Message will be publish:", isPublish, countPublishing)

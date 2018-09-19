@@ -92,6 +92,29 @@ func (pgmodel *PgDB) SetIsRunning(Id int, isRunning bool) {
 	}
 }
 
+func (pgmodel *PgDB) IncSentDelivery(pendingModel model.PendingTask, deliveryId, cnt int) {
+	delivery, err := pgmodel.GetDeliveryById(deliveryId)
+
+	if (err != nil) {
+		fmt.Println("ERror to find delivery by ID", deliveryId, err)
+	}
+
+	delivery.Sent += cnt
+
+	_, err = pgmodel.db.Model(delivery).
+		WherePK().
+		Update()
+
+	if (err != nil) {
+		fmt.Println("ERror to update delivery sent on pending task", delivery.Id, err)
+	}
+
+	_, err = pgmodel.db.Model(&pendingModel).WherePK().Delete()
+	if (err != nil) {
+		fmt.Println("Cant deliete pengind task", pendingModel.Id, err)
+	}
+}
+
 func (pgmodel *PgDB) SaveStatistic(scheduleId, countUsersDelivery int) {
 	scheduleItem, err := pgmodel.GetSchedulerById(scheduleId)
 
