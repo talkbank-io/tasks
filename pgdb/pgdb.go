@@ -391,8 +391,7 @@ func (pgmodel *PgDB) GetUsersByFilter(userIds string) ([]*model.Users, error) {
 	userModel := userRepository.GetUserModel()
 
 	query := pgmodel.db.Model(&userModel).
-		ColumnExpr("distinct(users.id)").
-		Column("users.*").
+		ColumnExpr("distinct on (users.id) users.*").
 		Join("INNER JOIN talkbank_bots.messenger_users AS messenger_users ON messenger_users.user_id = users.id").
 		Where("messenger_users.is_active = ?", true)
 
@@ -447,11 +446,9 @@ func (pgmodel *PgDB) GetActiveUsers(userIds string, filter []model.Filter) ([]*m
 	userModel := userRepository.GetUserModel()
 
 	query := pgmodel.db.Model(&userModel).
-		ColumnExpr("distinct(users.id)").
-		Column("users.*").
+		ColumnExpr("distinct on (users.id) users.*").
 		Join("INNER JOIN talkbank_bots.messenger_users AS messenger_users ON messenger_users.user_id = users.id").
-		Where("messenger_users.is_active = ?", true).
-		Where("messenger_users.is_main = ?", true)
+		Where("messenger_users.is_active = ?", true)
 
 	if( userIds != "" ){
 		users, ok := parseStringUserIds(userIds)
