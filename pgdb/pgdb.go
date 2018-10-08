@@ -158,7 +158,7 @@ func (pgmodel *PgDB) SaveStatistic(scheduleId, countUsersDelivery int) {
 			referenceDateFrom = scheduleItem.FromDatetime
 		}
 
-		next_run := nextRun.Next(referenceDateFrom)
+		next_run := nextRun.Next(referenceDateFrom).UTC()
 
 		if ( next_run.After(scheduleItem.ToDatetime) ) {
 			is_active = true
