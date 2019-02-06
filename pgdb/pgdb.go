@@ -47,21 +47,9 @@ func NewPgDB(config map[string]string) *PgDB {
 		Database: config["db"],
 	})
 
-	pgmodel.logSqlEvent()
 	return pgmodel
 }
 
-// Initialize log event with SQL
-func (pgmodel *PgDB) logSqlEvent() {
-	pgmodel.db.OnQueryProcessed(func(event *pg.QueryProcessedEvent) {
-		query, err := event.FormattedQuery()
-		if err != nil {
-			panic(err)
-		}
-
-		log.Printf("%s %s", time.Since(event.StartTime), query)
-	})
-}
 
 func (pgmodel *PgDB) SetHashAction(Id int, hash string) (string, error) {
 
