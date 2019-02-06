@@ -2,7 +2,6 @@ package pgdb
 
 import (
 	"fmt"
-	"log"
 	"time"
 	"crypto/sha256"
 	"encoding/base64"
