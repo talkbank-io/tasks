@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
-	"github.com/killer-djon/tasks/model"
+	"github.com/talkbank-io/tasks/model"
 	"github.com/gorhill/cronexpr"
 	"strings"
 	"regexp"

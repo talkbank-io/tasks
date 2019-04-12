@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 	"encoding/json"
-	"github.com/killer-djon/tasks/model"
-	"github.com/killer-djon/tasks/publisher"
-	"github.com/killer-djon/tasks/pgdb"
+	"github.com/talkbank-io/tasks/model"
+	"github.com/talkbank-io/tasks/publisher"
+	"github.com/talkbank-io/tasks/pgdb"
 )
 
 
