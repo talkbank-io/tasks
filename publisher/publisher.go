@@ -78,5 +78,5 @@ func (pub *Publisher) Publish(queue_name string, message []byte) (bool, error) {
         }
 
         return true, nil
-    }
+    }();
 }
