@@ -32,7 +32,7 @@ func (pub *Publisher) Close() {
 */
 func (pub *Publisher) Publish(queue_name string, message []byte) (bool, error) {
     // memory leak defer
-    return func() bool, error {
+    return func() (bool, error) {
         fmt.Println("Queue to publish:", queue_name)
 
         c, err := pub.conn.Channel()
@@ -78,5 +78,5 @@ func (pub *Publisher) Publish(queue_name string, message []byte) (bool, error) {
         }
 
         return true, nil
-    };
+    }
 }
