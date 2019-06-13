@@ -60,7 +60,8 @@ func (pending *Pending) Run(publisherConfig map[string]interface{}) map[string]i
 		}
 
 		channel := pending.pub
-		isPublish, err := channel.Publish(publisherConfig["queue_pending"].(string), message)
+		// isPublish, err := channel.Publish(publisherConfig["queue_pending"].(string), message)
+		isPublish, err := channel.PublishInChannel(publisherConfig["queue_pending"].(string), message)
 
 		if err != nil {
 			fmt.Println("error on publishing:", err)

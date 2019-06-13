@@ -106,7 +106,8 @@ func (schedule *Recurrently) Run(publisherConfig map[string]interface{}, cronJob
 				}
 
 				channel := schedule.pub
-				isPublish, err := channel.Publish(publisherConfig["queue_recurrently"].(string), message)
+				// isPublish, err := channel.Publish(publisherConfig["queue_recurrently"].(string), message)
+				isPublish, err := channel.PublishInChannel(publisherConfig["queue_recurrently"].(string), message)
 
 				if err != nil {
 					fmt.Println("error on publishing:", err)
