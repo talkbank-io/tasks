@@ -120,7 +120,8 @@ func (schedule *Onetime) Run(publisherConfig map[string]interface{}, cronJob *cr
 				}
 
 				channel := schedule.pub
-				isPublish, err := channel.Publish(publisherConfig["queue_onetime"].(string), message)
+				// isPublish, err := channel.Publish(publisherConfig["queue_onetime"].(string), message)
+				isPublish, err := channel.PublishInChannel(publisherConfig["queue_onetime"].(string), message)
 
 				if err != nil {
 					fmt.Println("error on publishing:", err)
