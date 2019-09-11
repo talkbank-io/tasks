@@ -8,11 +8,8 @@ type Parameters interface {
 
 }
 
-
-
-
 type Users struct{
-	tableName struct{} `sql:"talkbank_bots.users"`
+	tableName struct{} `pg:",discard_unknown_columns"sql:"talkbank_bots.users"`
 	Id int `sql:",pk"`
 	Hash string `sql:"type:varchar(16),unique:users_hash_key"`
 	FirstName string
@@ -21,16 +18,14 @@ type Users struct{
 	Parameters Parameters
 	IsIdentified bool
 	IsActivated bool
-	ChildId int
-	MessengerId int
-	CoreId int
+        SystemParameters string
 	CreatedAt time.Time `sql:"default:now()"`
 	UpdatedAt time.Time
 	//UserMessenger []*UserMessenger
 }
 
 type UserMessenger struct{
-	tableName struct{} `sql:"talkbank_bots.messenger_users"`
+	tableName struct{} `pg:",discard_unknown_columns"sql:"talkbank_bots.messenger_users"`
 	Id int `sql:",pk"`
 	Messenger string `sql:"type:varchar(32)"`
 	IsMain bool
@@ -63,3 +58,4 @@ func (userRepository *UserRepository) GetUserModel() []*Users {
 func (userRepository *UserRepository) GetUserMessengerModel() []*UserMessenger {
 	return userRepository.userMessengers
 }
+
