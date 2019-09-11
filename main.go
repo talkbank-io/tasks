@@ -155,18 +155,25 @@ func StartSchedulersJob() {
 		scheduleTaskItem := scheduleItem
 		cronJobStatus := cronJob.w.Status(scheduleTaskItem.Id)
 
-		currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
-		nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
+		// currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
+		//currentTime := time.Now().UTC()
+		//nextRunDate := scheduleTaskItem.NextRun.UTC()
+
+        currentTime, _ := time.Parse("2006-01-02 15:04", time.Now().UTC().Format("2006-01-02 15:04"))
+        nextRunDate, _ := time.Parse("2006-01-02 15:04", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
 
 		// Status inquires the status of a job, 0: running, 1: paused, -1: not started.
 		fmt.Printf("Running jobID: %d, actionID=%d, type=%s, and status: %s\n", scheduleTaskItem.Id, scheduleTaskItem.ActionId, scheduleTaskItem.Type, jobStatus[cronJobStatus])
 		if ( nextRunDate.Before(currentTime) && scheduleTaskItem.IsRunning == false && (cronJob.w.Status(scheduleTaskItem.Id) == 0)) {
+            // alarm:  true ;  false ;  0
+			fmt.Println("alarm: ", nextRunDate, currentTime, nextRunDate.Before(currentTime), "; ", scheduleTaskItem.IsRunning, "; ", cronJob.w.Status(scheduleTaskItem.Id))
 			notifyAlarm(scheduleTaskItem)
 		}else{
 			// если задача не запущена
 			// или не в паузе тогда создаем задачу и запускаем ее
 			if ( (cronJob.w.Status(scheduleTaskItem.Id) == -1 || cronJob.w.Status(scheduleTaskItem.Id) != 1) && nextRunDate.After(currentTime) ) {
 				if ( scheduleTaskItem.Type == "onetime" ) {
+					fmt.Println("go runOnetime;")
 					cronJob.w.AddFunc(CRON_ONETIME_FORMAT, scheduleTaskItem.Id, func() {
 						go runOnetime(scheduleTaskItem)
 					})
@@ -195,6 +202,8 @@ func StartSchedulersJob() {
 						go runRecurrently(scheduleTaskItem)
 					})
 				}
+			} else {
+				fmt.Println("not running: ", cronJob.w.Status(scheduleTaskItem.Id), "; ", cronJob.w.Status(scheduleTaskItem.Id), "; ", nextRunDate.After(currentTime), "; ", scheduleTaskItem.NextRun.UTC().Format("2006-01-02 15:04"))
 			}
 		}
 	}
